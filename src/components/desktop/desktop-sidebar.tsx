@@ -26,7 +26,7 @@ interface NavItem {
 
 const patientNavItems: NavItem[] = [
   { href: "/patient/dashboard", icon: Home, label: "Dashboard" },
-  { href: "/patient/upload", icon: FileStack, label: "My Scans" },
+  { href: "/patient/my-scans", icon: FileStack, label: "My Scans" },
   { href: "/patient/results", icon: BarChart3, label: "AI Results" },
   { href: "/patient/wallet", icon: Wallet, label: "Wallet" },
   { href: "/patient/settings", icon: Settings, label: "Settings" },

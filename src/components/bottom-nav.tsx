@@ -8,7 +8,7 @@ import { Home, FileStack, BarChart3, Settings, Wallet, Users, FileText } from "l
 
 const patientNavItems = [
   { href: "/patient/dashboard", icon: Home, label: "Home" },
-  { href: "/patient/upload", icon: FileStack, label: "My Scans" },
+  { href: "/patient/my-scans", icon: FileStack, label: "My Scans" },
   { href: "/patient/results", icon: BarChart3, label: "Insights", isCenter: true },
   { href: "/patient/wallet", icon: Wallet, label: "Wallet" },
   { href: "/patient/settings", icon: Settings, label: "Settings" },
