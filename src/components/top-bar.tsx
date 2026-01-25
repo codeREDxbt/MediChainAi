@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { Bell, Settings } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/lib/auth-context";
 
 interface TopBarProps {
   title?: string;
@@ -25,6 +26,7 @@ export function TopBar({
   rightContent,
   className,
 }: TopBarProps) {
+  const { role } = useAuth();
   return (
     <header
       className={cn(
@@ -38,7 +40,7 @@ export function TopBar({
         <div className="flex items-center gap-3">
           {showBack && (
             <Link
-              href="/dashboard"
+              href={role === "admin" ? "/admin/dashboard" : "/patient/dashboard"}
               className="flex items-center justify-center w-9 h-9 rounded-xl hover:bg-muted transition-colors"
             >
               <svg
@@ -58,7 +60,7 @@ export function TopBar({
           )}
 
           {showLogo && !title && (
-            <Link href="/dashboard" className="flex items-center gap-2">
+            <Link href={role === "admin" ? "/admin/dashboard" : "/patient/dashboard"} className="flex items-center gap-2">
               <div className="w-8 h-8 rounded-xl bg-primary/10 flex items-center justify-center">
                 <MediChainLogo className="w-5 h-5 text-primary" />
               </div>

@@ -3,9 +3,25 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
-import { Home, FileStack, BarChart3, Settings, Wallet } from "lucide-react";
+import { useAuth } from "@/lib/auth-context";
+import { Home, FileStack, BarChart3, Settings, Wallet, Users, FileText } from "lucide-react";
 
-const navItems = [
+const patientNavItems = [
+  { href: "/patient/dashboard", icon: Home, label: "Home" },
+  { href: "/patient/upload", icon: FileStack, label: "My Scans" },
+  { href: "/patient/results", icon: BarChart3, label: "Insights", isCenter: true },
+  { href: "/patient/wallet", icon: Wallet, label: "Wallet" },
+  { href: "/patient/settings", icon: Settings, label: "Settings" },
+];
+
+const adminNavItems = [
+  { href: "/admin/dashboard", icon: Home, label: "Home" },
+  { href: "/admin/patients", icon: Users, label: "Patients" },
+  { href: "/admin/reports", icon: FileText, label: "Reports", isCenter: true },
+  { href: "/admin/settings", icon: Settings, label: "Settings" },
+];
+
+const legacyNavItems = [
   { href: "/dashboard", icon: Home, label: "Home" },
   { href: "/upload", icon: FileStack, label: "My Scans" },
   { href: "/status", icon: BarChart3, label: "Insights", isCenter: true },
@@ -15,6 +31,13 @@ const navItems = [
 
 export function BottomNav() {
   const pathname = usePathname();
+  const { role } = useAuth();
+
+  const navItems = role === "admin" 
+    ? adminNavItems 
+    : role === "patient" 
+      ? patientNavItems 
+      : legacyNavItems;
 
   return (
     <nav
@@ -28,7 +51,7 @@ export function BottomNav() {
     >
       <div className="flex items-center justify-around px-2 py-2">
         {navItems.map((item) => {
-          const isActive = pathname === item.href || (item.href !== "/dashboard" && pathname.startsWith(item.href));
+          const isActive = pathname === item.href || (item.href !== "/patient/dashboard" && item.href !== "/admin/dashboard" && item.href !== "/dashboard" && pathname.startsWith(item.href));
           const Icon = item.icon;
 
           if (item.isCenter) {
