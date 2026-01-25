@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "@/components/theme-provider";
+import { Web3Provider } from "@/components/web3-provider";
 import { AuthProvider } from "@/lib/auth-context";
 
 const inter = Inter({ 
@@ -39,9 +40,11 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          <AuthProvider>
-            {children}
-          </AuthProvider>
+          <Web3Provider>
+            <AuthProvider>
+              {children}
+            </AuthProvider>
+          </Web3Provider>
         </ThemeProvider>
       </body>
     </html>
