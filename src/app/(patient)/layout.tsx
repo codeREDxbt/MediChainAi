@@ -10,7 +10,7 @@ export default function PatientLayout({
 }) {
   return (
     <AuthGuard allowedRoles={["patient"]}>
-      <ResponsiveLayout>
+      <ResponsiveLayout layoutMode="top-nav">
         {children}
       </ResponsiveLayout>
     </AuthGuard>
