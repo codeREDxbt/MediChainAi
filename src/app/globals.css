@@ -3,78 +3,129 @@
 @tailwind utilities;
 
 @layer base {
+
+  button:focus-visible,
+  a:focus-visible,
+  input:focus-visible,
+  [role="button"]:focus-visible {
+    outline: 2px solid theme('colors.emerald.500');
+    outline-offset: 2px;
+  }
+}
+
+@layer base {
   :root {
-    /* Light theme - from mockup palette */
-    --background: 210 20% 98%; /* #f7f9fb */
-    --foreground: 210 20% 10%;
-    
-    --card: 0 0% 100%; /* white */
-    --card-foreground: 210 20% 10%;
-    
+    --font-primary: var(--font-instrument);
+    --font-secondary: var(--font-inter);
+
+    /* Light theme - WCAG AA compliant colors */
+    --background: 0 0% 100%;
+    /* #ffffff */
+    --foreground: 222 47% 11%;
+    /* #0f172a slate-900 */
+
+    --card: 0 0% 100%;
+    /* white */
+    --card-foreground: 222 47% 11%;
+    /* #0f172a */
+
     --popover: 0 0% 100%;
-    --popover-foreground: 210 20% 10%;
-    
-    --primary: 199 89% 48%; /* Medical blue #0ea5e9 */
+    --popover-foreground: 222 47% 11%;
+
+    --primary: 217 91% 60%;
+    /* Medical blue #3B82F6 */
     --primary-foreground: 0 0% 100%;
-    
-    --secondary: 210 15% 96%; /* #fbfcfd */
-    --secondary-foreground: 210 20% 20%;
-    
-    --muted: 210 15% 85%; /* #cfd7dd */
-    --muted-foreground: 210 10% 45%;
-    
-    --accent: 160 84% 39%; /* Teal #10b981 */
+    /* white */
+
+    --secondary: 215 20% 96%;
+    /* #f8fafc slate-50 */
+    --secondary-foreground: 222 47% 11%;
+    /* #0f172a */
+
+    --muted: 215 20% 96%;
+    /* #f8fafc slate-50 */
+    --muted-foreground: 215 16% 47%;
+    /* #64748b slate-500 - WCAG AA */
+
+    --accent: 160 84% 39%;
+    /* Emerald/Teal #10b981 */
     --accent-foreground: 0 0% 100%;
-    
+    /* white */
+
     --destructive: 0 84% 60%;
+    /* #ef4444 red-500 */
     --destructive-foreground: 0 0% 100%;
-    
-    --border: 210 20% 91%; /* #e5ebef */
-    --input: 210 20% 91%;
-    --ring: 199 89% 48%;
-    
-    --radius: 0.75rem;
-    
+
+    --border: 214 32% 91%;
+    /* #e2e8f0 slate-200 */
+    --input: 214 32% 91%;
+    --ring: 217 91% 60%;
+    /* primary */
+
+    --radius: 0.5rem;
+
     /* Glass effects */
     --glass-bg: rgba(255, 255, 255, 0.7);
     --glass-border: rgba(255, 255, 255, 0.3);
     --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
+    --chart-1: 12 76% 61%;
+    --chart-2: 173 58% 39%;
+    --chart-3: 197 37% 24%;
+    --chart-4: 43 74% 66%;
+    --chart-5: 27 87% 67%;
   }
 
   .dark {
-    /* Dark theme - from mockup palette */
-    --background: 220 15% 8%; /* #111417 */
-    --foreground: 210 20% 95%;
-    
-    --card: 220 12% 12%; /* #1a1d21 */
-    --card-foreground: 210 20% 95%;
-    
-    --popover: 220 12% 12%;
-    --popover-foreground: 210 20% 95%;
-    
-    --primary: 199 89% 48%; /* Medical blue stays same */
+    /* Dark theme - WCAG AA compliant colors */
+    --background: 222 47% 11%;
+    /* #0f172a slate-900 */
+    --foreground: 210 40% 98%;
+    /* #f8fafc slate-50 */
+
+    --card: 217 33% 17%;
+    /* #1e293b slate-800 */
+    --card-foreground: 210 40% 98%;
+    /* #f8fafc */
+
+    --popover: 222 47% 11%;
+    --popover-foreground: 210 40% 98%;
+
+    --primary: 217 91% 60%;
+    /* Medical blue #3B82F6 */
     --primary-foreground: 0 0% 100%;
-    
-    --secondary: 220 10% 18%;
-    --secondary-foreground: 210 20% 85%;
-    
-    --muted: 220 10% 25%;
-    --muted-foreground: 210 10% 55%;
-    
-    --accent: 160 84% 39%; /* Teal stays same */
+    /* white */
+
+    --secondary: 217 33% 17%;
+    /* #1e293b slate-800 */
+    --secondary-foreground: 210 40% 98%;
+
+    --muted: 217 33% 17%;
+    /* #1e293b slate-800 */
+    --muted-foreground: 215 16% 65%;
+    /* #94a3b8 slate-400 - WCAG AA on dark */
+
+    --accent: 160 84% 39%;
+    /* Emerald/Teal #10b981 */
     --accent-foreground: 0 0% 100%;
-    
-    --destructive: 0 62% 50%;
+
+    --destructive: 0 84% 60%;
+    /* #ef4444 red-500 */
     --destructive-foreground: 0 0% 100%;
-    
-    --border: 220 10% 20%; /* #2a2d32 */
-    --input: 220 10% 20%;
-    --ring: 199 89% 48%;
-    
+
+    --border: 217 32% 27%;
+    /* #334155 slate-700 */
+    --input: 217 32% 27%;
+    --ring: 217 91% 60%;
+
     /* Glass effects - dark */
-    --glass-bg: rgba(26, 29, 33, 0.8);
+    --glass-bg: rgba(30, 41, 59, 0.8);
     --glass-border: rgba(255, 255, 255, 0.08);
     --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+    --chart-1: 220 70% 50%;
+    --chart-2: 160 60% 45%;
+    --chart-3: 30 80% 55%;
+    --chart-4: 280 65% 60%;
+    --chart-5: 340 75% 55%;
   }
 }
 
@@ -85,6 +136,7 @@
 
   body {
     @apply bg-background text-foreground antialiased;
+    font-family: var(--font-primary), var(--font-secondary), ui-sans-serif, system-ui;
     font-feature-settings: "rlig" 1, "calt" 1;
   }
 
@@ -94,6 +146,7 @@
 }
 
 @layer components {
+
   /* Glassmorphic card style */
   .glass-card {
     background: var(--glass-bg);
@@ -111,21 +164,17 @@
 
   /* Soft gradient background */
   .gradient-bg {
-    background: linear-gradient(
-      135deg,
-      hsl(var(--background)) 0%,
-      hsl(210 20% 95%) 50%,
-      hsl(var(--background)) 100%
-    );
+    background: linear-gradient(135deg,
+        hsl(var(--background)) 0%,
+        hsl(210 20% 95%) 50%,
+        hsl(var(--background)) 100%);
   }
 
   .dark .gradient-bg {
-    background: linear-gradient(
-      135deg,
-      hsl(var(--background)) 0%,
-      hsl(220 15% 10%) 50%,
-      hsl(var(--background)) 100%
-    );
+    background: linear-gradient(135deg,
+        hsl(var(--background)) 0%,
+        hsl(220 15% 10%) 50%,
+        hsl(var(--background)) 100%);
   }
 
   /* Noise overlay - subtle texture */
@@ -163,6 +212,7 @@
 }
 
 @layer utilities {
+
   /* Text gradient utility */
   .text-gradient {
     @apply bg-clip-text text-transparent bg-gradient-to-r from-primary to-accent;
@@ -175,5 +225,38 @@
 
   .safe-top {
     padding-top: env(safe-area-inset-top, 0px);
+  }
+
+  /* Typography Scale - WCAG Compliant */
+  .heading-1 {
+    @apply text-3xl lg:text-4xl font-bold tracking-tight text-foreground;
+  }
+
+  .heading-2 {
+    @apply text-2xl lg:text-3xl font-semibold tracking-tight text-foreground;
+  }
+
+  .heading-3 {
+    @apply text-xl lg:text-2xl font-semibold text-foreground;
+  }
+
+  .heading-4 {
+    @apply text-lg font-semibold text-foreground;
+  }
+
+  .body-large {
+    @apply text-lg text-foreground;
+  }
+
+  .body {
+    @apply text-base text-foreground;
+  }
+
+  .body-small {
+    @apply text-sm text-foreground;
+  }
+
+  .caption {
+    @apply text-sm text-muted-foreground;
   }
 }

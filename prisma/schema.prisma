@@ -1,0 +1,56 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id                String   @id @default(uuid())
+  walletAddress     String   @unique @map("wallet_address")
+  username          String?
+  email             String?
+  phone             String?
+  dateOfBirth       DateTime? @map("date_of_birth")
+  emergencyContact  String?   @map("emergency_contact")
+  avatarUrl         String?   @map("avatar_url")
+  role              String   @default("patient")
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+  scans             Scan[]
+
+  @@map("users")
+}
+
+model Scan {
+  id              String          @id @default(uuid())
+  userId          String          @map("user_id")
+  user            User            @relation(fields: [userId], references: [id])
+  fileHash        String          @map("file_hash")
+  originalName    String?         @map("original_name")
+  modality        String?
+  patientName     String?         @map("patient_name")
+  studyDate       DateTime?       @map("study_date")
+  seriesDesc      String?         @map("series_description")
+  convertedImage  String?         @map("converted_image")
+  status          String          @default("uploading")
+  uploadDate      DateTime        @default(now()) @map("upload_date")
+  analysis        AnalysisResult?
+
+  @@map("scans")
+}
+
+model AnalysisResult {
+  id              String   @id @default(uuid())
+  scanId          String   @unique @map("scan_id")
+  scan            Scan     @relation(fields: [scanId], references: [id])
+  confidenceScore Float?   @map("confidence_score")
+  findings        Json?    // Postgres supports native JSON
+  processedAt     DateTime @default(now()) @map("processed_at")
+
+  @@map("analysis_results")
+}

@@ -1,51 +1,48 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { jwtVerify } from 'jose';
 
-const JWT_SECRET = new TextEncoder().encode(
-  process.env.JWT_SECRET || 'medichain-dev-secret-key-change-in-production'
-);
+import { NextResponse } from "next/server";
+import { jwtVerify } from "jose";
+import { cookies } from "next/headers";
+import { supabase } from "@/lib/supabase";
+import { getJwtSecret } from "@/lib/jwt";
 
-export async function GET(request: NextRequest) {
+export const dynamic = 'force-dynamic';
+
+export async function GET() {
   try {
-    const token = request.cookies.get('auth_token')?.value;
-    
+    const token = (await cookies()).get("token")?.value;
+
     if (!token) {
-      return NextResponse.json(
-        { user: null },
-        { status: 200 }
-      );
+      return NextResponse.json({ user: null });
     }
-    
+
+    const secret = getJwtSecret();
+
     // Verify JWT
-    const { payload } = await jwtVerify(token, JWT_SECRET);
-    
-    // Return user info from token
-    return NextResponse.json({
-      user: {
-        id: payload.sub,
-        address: payload.address,
-        role: payload.role,
-        name: payload.role === 'admin' 
-          ? 'Admin User' 
-          : `User ${(payload.address as string).slice(0, 6)}...${(payload.address as string).slice(-4)}`,
-      },
-    });
+    const { payload } = await jwtVerify(token, secret);
+    // payload has sub (id), walletAddress, role
+
+    // Optionally fetch fresh data from DB to ensure user still exists/role hasn't changed
+    const { data: user, error } = await supabase
+      .from('users')
+      .select('*')
+      .eq('id', payload.sub)
+      .single();
+
+    if (error || !user) {
+      return NextResponse.json({ user: null });
+    }
+
+    // Map to AuthUser interface
+    const authUser = {
+      id: user.id,
+      name: user.username || "Anonymous",
+      address: user.wallet_address,
+      role: user.role
+    };
+
+    return NextResponse.json({ user: authUser });
   } catch (error) {
-    // Token is invalid or expired
-    const response = NextResponse.json(
-      { user: null },
-      { status: 200 }
-    );
-    
-    // Clear invalid token
-    response.cookies.set('auth_token', '', {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
-      maxAge: 0,
-      path: '/',
-    });
-    
-    return response;
+    // If token invalid/expired, return null user
+    return NextResponse.json({ user: null });
   }
 }

@@ -26,7 +26,11 @@ yarn-debug.log*
 yarn-error.log*
 
 # local env files
+.env
 .env*.local
+
+# dev database
+dev.db
 
 # vercel
 .vercel
@@ -34,3 +38,41 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+/generated/prisma
+
+# =========================
+# Security & Secrets
+# =========================
+# Private keys
+*.key
+*.p12
+*.pfx
+
+# Application secrets
+*.secret
+*secrects.json
+service-account.json
+credentials.json
+auth.json
+
+# Local databases
+*.sqlite
+*.sqlite3
+*.db
+*.db-journal
+
+# Logs
+*.log
+
+# OS & IDE
+.idea/
+.vscode/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.swp
+*~
+.DS_Store
+Thumbs.db

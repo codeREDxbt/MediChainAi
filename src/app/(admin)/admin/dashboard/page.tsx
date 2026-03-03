@@ -1,339 +1,265 @@
 "use client";
 
-import { useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { 
-  FileStack, 
-  Activity, 
-  TrendingUp, 
-  AlertTriangle,
+import React, { useState } from "react";
+import {
+  FileStack,
+  Activity,
+  TrendingUp,
+  ShieldCheck,
+  Users,
+  Zap,
   Download,
-  Filter,
-  ChevronDown,
-  FileText,
   Calendar,
+  Bell,
+  Search,
+  Filter,
   MoreHorizontal
 } from "lucide-react";
+import { WobbleCard } from "@/components/ui/wobble-card";
+import { NumberTicker } from "@/components/ui/number-ticker";
+import { StickyScroll } from "@/components/ui/sticky-scroll-reveal";
+import { FocusCards } from "@/components/ui/focus-cards";
+import { motion } from "framer-motion";
+import { cn } from "@/lib/utils";
 
-// KPI Data
+// --- Mock Data & Constants ---
+
 const kpiCards = [
-  { 
-    label: "Total Scans", 
-    value: "12,453", 
-    change: "+847 this month", 
+  {
+    label: "Total Scans Processed",
+    value: 12453,
+    change: "+12.5%",
+    trend: "up",
     icon: FileStack,
-    color: "bg-blue-500/10 text-blue-600 dark:text-blue-400",
-    iconBg: "bg-blue-500/10"
+    color: "bg-blue-600",
   },
-  { 
-    label: "AI Accuracy", 
-    value: "97.2%", 
-    change: "+0.5% from last week", 
-    icon: Activity,
-    color: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400",
-    iconBg: "bg-emerald-500/10"
+  {
+    label: "AI Accuracy Rate",
+    value: 97.2,
+    change: "+0.8%",
+    trend: "up",
+    icon: ShieldCheck,
+    color: "bg-emerald-600",
   },
-  { 
-    label: "Efficiency Gain", 
-    value: "42%", 
-    change: "vs. manual review", 
-    icon: TrendingUp,
-    color: "bg-violet-500/10 text-violet-600 dark:text-violet-400",
-    iconBg: "bg-violet-500/10"
+  {
+    label: "Active Nodes",
+    value: 847,
+    change: "+24 new",
+    trend: "up",
+    icon: Users,
+    color: "bg-violet-600",
   },
-  { 
-    label: "Active Alerts", 
-    value: "7", 
-    change: "3 high priority", 
-    icon: AlertTriangle,
-    color: "bg-amber-500/10 text-amber-600 dark:text-amber-400",
-    iconBg: "bg-amber-500/10"
+  {
+    label: "System Load",
+    value: 42,
+    change: "-5% vs peak",
+    trend: "down",
+    icon: Zap,
+    color: "bg-rose-600",
   },
 ];
 
-// Monthly trends data for bar chart
 const monthlyTrends = [
-  { month: "Jan", ct: 420, mri: 310, xray: 580, ultrasound: 190 },
-  { month: "Feb", ct: 380, mri: 290, xray: 620, ultrasound: 210 },
-  { month: "Mar", ct: 510, mri: 340, xray: 490, ultrasound: 230 },
-  { month: "Apr", ct: 470, mri: 380, xray: 550, ultrasound: 250 },
-  { month: "May", ct: 540, mri: 410, xray: 610, ultrasound: 280 },
-  { month: "Jun", ct: 620, mri: 450, xray: 680, ultrasound: 320 },
+  { month: "Aug", ct: 420, mri: 310, xray: 580, ultrasound: 190 },
+  { month: "Sep", ct: 380, mri: 290, xray: 620, ultrasound: 210 },
+  { month: "Oct", ct: 510, mri: 340, xray: 490, ultrasound: 230 },
+  { month: "Nov", ct: 470, mri: 380, xray: 550, ultrasound: 250 },
+  { month: "Dec", ct: 540, mri: 410, xray: 610, ultrasound: 280 },
+  { month: "Jan", ct: 620, mri: 450, xray: 680, ultrasound: 320 },
 ];
 
-// Disease categories for donut chart
 const diseaseCategories = [
-  { name: "Pulmonary", percentage: 32, color: "bg-blue-500" },
-  { name: "Cardiac", percentage: 24, color: "bg-rose-500" },
-  { name: "Neurological", percentage: 18, color: "bg-violet-500" },
-  { name: "Musculoskeletal", percentage: 14, color: "bg-emerald-500" },
-  { name: "Oncology", percentage: 8, color: "bg-amber-500" },
-  { name: "Other", percentage: 4, color: "bg-slate-400" },
+  { name: "Pulmonary", percentage: 32, color: "text-blue-500", stroke: "#3b82f6" },
+  { name: "Cardiac", percentage: 24, color: "text-rose-500", stroke: "#f43f5e" },
+  { name: "Neuro", percentage: 18, color: "text-violet-500", stroke: "#8b5cf6" },
+  { name: "Skeletal", percentage: 14, color: "text-emerald-500", stroke: "#10b981" },
+  { name: "Other", percentage: 12, color: "text-slate-400", stroke: "#94a3b8" },
 ];
 
-// Generated reports
 const generatedReports = [
-  { id: "RPT-2026-001", name: "Monthly Diagnostic Summary", type: "Analytics", date: "Jan 25, 2026", status: "Ready", size: "2.4 MB" },
-  { id: "RPT-2026-002", name: "AI Performance Metrics Q4", type: "Performance", date: "Jan 24, 2026", status: "Ready", size: "1.8 MB" },
-  { id: "RPT-2026-003", name: "Patient Demographics Report", type: "Demographics", date: "Jan 23, 2026", status: "Ready", size: "3.2 MB" },
-  { id: "RPT-2026-004", name: "Federated Learning Status", type: "Technical", date: "Jan 22, 2026", status: "Processing", size: "—" },
-  { id: "RPT-2026-005", name: "Weekly Scan Volume Analysis", type: "Analytics", date: "Jan 20, 2026", status: "Ready", size: "1.1 MB" },
+  { id: "RPT-2026-001", name: "Monthly Diagnostic Summary", type: "Analytics", date: "Jan 25, 2026", status: "Ready" },
+  { id: "RPT-2026-002", name: "AI Performance Metrics Q4", type: "Performance", date: "Jan 24, 2026", status: "Ready" },
+  { id: "RPT-2026-003", name: "Patient Demographics Report", type: "Demographics", date: "Jan 23, 2026", status: "Ready" },
+  { id: "RPT-2026-004", name: "Federated Learning Logs", type: "Technical", date: "Jan 22, 2026", status: "Processing" },
 ];
 
-const reportTypes = ["All Types", "Analytics", "Performance", "Demographics", "Technical"];
+const quickActions = [
+  {
+    title: "Review High Risk Cases",
+    src: "https://images.unsplash.com/photo-1551076805-e18690c5e53b?q=80&w=2938&auto=format&fit=crop",
+  },
+  {
+    title: "Generate Analytics Report",
+    src: "https://images.unsplash.com/photo-1460925895917-afdab827c52f?q=80&w=2426&auto=format&fit=crop",
+  },
+  {
+    title: "Manage Federated Nodes",
+    src: "https://images.unsplash.com/photo-1558494949-ef010cbdcc31?q=80&w=2034&auto=format&fit=crop",
+  },
+];
 
 export default function AdminDashboardPage() {
-  const [selectedReportType, setSelectedReportType] = useState("All Types");
-  const maxValue = Math.max(...monthlyTrends.flatMap(m => [m.ct, m.mri, m.xray, m.ultrasound]));
+  const [searchQuery, setSearchQuery] = useState("");
 
-  const filteredReports = selectedReportType === "All Types" 
-    ? generatedReports 
-    : generatedReports.filter(r => r.type === selectedReportType);
+  const content = [
+    {
+      title: "Diagnostic Volume Trends",
+      description:
+        "Track the volume of MRI, CT, X-Ray, and Ultrasound scans processed by the MediChainAI network across all connected healthcare facilities over the past six months. This data is critical for scaling our federated computing nodes.",
+      content: (
+        <div className="h-full w-full bg-[#171717] rounded-xl flex items-center justify-center p-6 text-white overflow-hidden shadow-inner">
+          <div className="w-full h-full flex items-end justify-between gap-4">
+            {monthlyTrends.map((month) => {
+              const maxValue = 1800; // max total is ~1800
+              const total = month.ct + month.mri + month.xray + month.ultrasound;
+              const hPercent = (total / maxValue) * 100;
+              return (
+                <div key={month.month} className="flex-1 flex flex-col justify-end items-center h-full gap-2">
+                  <div className="w-full rounded-t-sm overflow-hidden flex flex-col-reverse relative hover:brightness-110 transition-all cursor-pointer" style={{ height: `${hPercent}%` }}>
+                    <div style={{ flex: month.ct, backgroundColor: '#3b82f6' }} className="w-full" />
+                    <div style={{ flex: month.mri, backgroundColor: '#10b981' }} className="w-full" />
+                    <div style={{ flex: month.xray, backgroundColor: '#f59e0b' }} className="w-full" />
+                    <div style={{ flex: month.ultrasound, backgroundColor: '#8b5cf6' }} className="w-full" />
+                  </div>
+                  <span className="text-xs font-medium text-slate-400">{month.month}</span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      ),
+    },
+    {
+      title: "Disease Distribution Insights",
+      description:
+        "Real-time breakdown of disease categories identified by our consensus AI model. Notice the significant uptick in pulmonary anomalies correlating with the latest seasonal findings. Validated via decentralized consensus.",
+      content: (
+        <div className="h-full w-full bg-[#171717] flex items-center justify-center p-6 text-white rounded-xl shadow-inner">
+          <div className="relative w-48 h-48">
+            <svg viewBox="0 0 100 100" className="w-full h-full -rotate-90">
+              {diseaseCategories.reduce((acc, cat) => {
+                const dashArray = `${cat.percentage} ${100 - cat.percentage}`;
+                const offset = acc.offset;
+                acc.elements.push(
+                  <circle
+                    key={cat.name}
+                    cx="50"
+                    cy="50"
+                    r="40"
+                    fill="none"
+                    stroke={cat.stroke}
+                    strokeWidth="12"
+                    strokeDasharray={dashArray}
+                    strokeDashoffset={-offset}
+                    strokeLinecap="round"
+                    className="transition-all duration-700 hover:strokeWidth-[16px] cursor-pointer"
+                  />
+                );
+                acc.offset += cat.percentage;
+                return acc;
+              }, { elements: [] as React.ReactElement[], offset: 0 }).elements}
+            </svg>
+            <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+              <span className="text-2xl font-bold tracking-tighter text-white">100%</span>
+              <span className="text-[10px] text-slate-400 font-medium uppercase tracking-widest">Total</span>
+            </div>
+          </div>
+        </div>
+      ),
+    },
+    {
+      title: "Recent Generated Reports",
+      description:
+        "Access cryptographic proofs, validation reports, and analytics summaries from the ledger. These reports are generated and signed by the master node and broadcasted to stakeholders.",
+      content: (
+        <div className="h-full w-full bg-[#171717] rounded-xl text-white p-6 shadow-inner overflow-hidden flex flex-col">
+          <div className="space-y-4 flex-1 mt-4">
+            {generatedReports.map((report) => (
+              <div key={report.id} className="flex items-center justify-between p-3 bg-white/5 rounded-lg border border-white/5">
+                <div>
+                  <p className="text-sm font-semibold truncate max-w-[120px]">{report.name}</p>
+                  <p className="text-xs text-slate-400">{report.id}</p>
+                </div>
+                <div className="text-right">
+                  <span className={cn("text-[10px] px-2 py-1 rounded-full", report.status === 'Ready' ? "bg-emerald-500/20 text-emerald-400" : "bg-amber-500/20 text-amber-400")}>
+                    {report.status}
+                  </span>
+                  <p className="text-[10px] text-slate-500 mt-1">{report.date}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      ),
+    },
+  ];
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
+    <main className="space-y-10 py-8 px-4 md:px-8 max-w-7xl mx-auto pb-24">
+
+      {/* Header Area */}
+      <header className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-foreground lg:text-3xl">Admin Dashboard</h1>
-          <p className="text-muted-foreground">System analytics and reporting overview</p>
+          <h1 className="text-4xl font-bold tracking-tight text-slate-900 dark:text-white">Admin Overview</h1>
+          <p className="text-slate-500 mt-2">Network analytics, AI consensus metrics, and administrative controls.</p>
         </div>
-        <Badge variant="success" className="hidden lg:flex gap-1">
-          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-          All Systems Operational
-        </Badge>
-      </div>
-
-      {/* KPI Cards */}
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-        {kpiCards.map((kpi) => {
-          const Icon = kpi.icon;
-          return (
-            <Card key={kpi.label} className="overflow-hidden">
-              <CardContent className="p-5">
-                <div className="flex items-start justify-between">
-                  <div className={`w-12 h-12 rounded-xl ${kpi.iconBg} flex items-center justify-center`}>
-                    <Icon className={`w-6 h-6 ${kpi.color.split(' ')[1]}`} />
-                  </div>
-                </div>
-                <div className="mt-4">
-                  <p className="text-3xl font-bold text-foreground">{kpi.value}</p>
-                  <p className="text-xs text-muted-foreground mt-1">{kpi.label}</p>
-                  <p className={`text-xs mt-2 ${kpi.color.split(' ')[1]}`}>{kpi.change}</p>
-                </div>
-              </CardContent>
-            </Card>
-          );
-        })}
-      </div>
-
-      {/* Charts Row */}
-      <div className="grid gap-6 lg:grid-cols-3">
-        {/* Bar Chart - Monthly Diagnostic Trends */}
-        <Card className="lg:col-span-2">
-          <CardHeader className="pb-2">
-            <CardTitle className="flex items-center justify-between">
-              <span className="flex items-center gap-2">
-                <TrendingUp className="w-5 h-5 text-primary" />
-                Monthly Diagnostic Trends
-              </span>
-              <Button variant="ghost" size="sm" className="text-xs">
-                <Calendar className="w-4 h-4 mr-1" />
-                Last 6 Months
-                <ChevronDown className="w-4 h-4 ml-1" />
-              </Button>
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {/* Legend */}
-            <div className="flex flex-wrap gap-4 mb-4 text-xs">
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-3 rounded bg-blue-500" />
-                <span>CT</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-3 rounded bg-emerald-500" />
-                <span>MRI</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-3 rounded bg-amber-500" />
-                <span>X-Ray</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-3 rounded bg-violet-500" />
-                <span>Ultrasound</span>
-              </div>
-            </div>
-            
-            {/* Bar Chart */}
-            <div className="flex items-end justify-between gap-2 h-48">
-              {monthlyTrends.map((month) => (
-                <div key={month.month} className="flex-1 flex flex-col items-center gap-1">
-                  <div className="w-full flex items-end justify-center gap-0.5 h-40">
-                    <div 
-                      className="w-2 lg:w-3 bg-blue-500 rounded-t transition-all duration-300"
-                      style={{ height: `${(month.ct / maxValue) * 100}%` }}
-                    />
-                    <div 
-                      className="w-2 lg:w-3 bg-emerald-500 rounded-t transition-all duration-300"
-                      style={{ height: `${(month.mri / maxValue) * 100}%` }}
-                    />
-                    <div 
-                      className="w-2 lg:w-3 bg-amber-500 rounded-t transition-all duration-300"
-                      style={{ height: `${(month.xray / maxValue) * 100}%` }}
-                    />
-                    <div 
-                      className="w-2 lg:w-3 bg-violet-500 rounded-t transition-all duration-300"
-                      style={{ height: `${(month.ultrasound / maxValue) * 100}%` }}
-                    />
-                  </div>
-                  <span className="text-xs text-muted-foreground">{month.month}</span>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Donut Chart - Disease Categories */}
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="flex items-center gap-2">
-              <Activity className="w-5 h-5 text-primary" />
-              Disease Categories
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {/* Donut Chart */}
-            <div className="relative w-40 h-40 mx-auto mb-4">
-              <svg viewBox="0 0 100 100" className="w-full h-full -rotate-90">
-                {diseaseCategories.reduce((acc, category, index) => {
-                  const offset = acc.offset;
-                  const dashArray = `${category.percentage} ${100 - category.percentage}`;
-                  const colors = ["#3b82f6", "#f43f5e", "#8b5cf6", "#10b981", "#f59e0b", "#94a3b8"];
-                  
-                  acc.elements.push(
-                    <circle
-                      key={category.name}
-                      cx="50"
-                      cy="50"
-                      r="40"
-                      fill="none"
-                      stroke={colors[index]}
-                      strokeWidth="12"
-                      strokeDasharray={dashArray}
-                      strokeDashoffset={-offset}
-                      className="transition-all duration-500"
-                    />
-                  );
-                  acc.offset += category.percentage;
-                  return acc;
-                }, { elements: [] as JSX.Element[], offset: 0 }).elements}
-              </svg>
-              <div className="absolute inset-0 flex flex-col items-center justify-center">
-                <span className="text-2xl font-bold">100%</span>
-                <span className="text-xs text-muted-foreground">Total</span>
-              </div>
-            </div>
-            
-            {/* Legend */}
-            <div className="space-y-2">
-              {diseaseCategories.map((category) => (
-                <div key={category.name} className="flex items-center justify-between text-sm">
-                  <div className="flex items-center gap-2">
-                    <div className={`w-3 h-3 rounded ${category.color}`} />
-                    <span>{category.name}</span>
-                  </div>
-                  <span className="font-medium">{category.percentage}%</span>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Generated Reports Table */}
-      <Card>
-        <CardHeader>
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-            <CardTitle className="flex items-center gap-2">
-              <FileText className="w-5 h-5 text-primary" />
-              Generated Reports
-            </CardTitle>
-            <div className="flex items-center gap-2">
-              <div className="relative">
-                <select
-                  value={selectedReportType}
-                  onChange={(e) => setSelectedReportType(e.target.value)}
-                  className="appearance-none bg-muted/50 border border-border rounded-lg px-3 py-2 pr-8 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
-                >
-                  {reportTypes.map((type) => (
-                    <option key={type} value={type}>{type}</option>
-                  ))}
-                </select>
-                <Filter className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
-              </div>
-              <Button variant="outline" size="sm">
-                <Download className="w-4 h-4 mr-2" />
-                Export All
-              </Button>
-            </div>
+        <div className="flex items-center gap-3">
+          <div className="hidden sm:flex items-center gap-2 bg-slate-100 dark:bg-slate-800/50 px-4 py-2 rounded-full text-sm font-medium">
+            <Calendar className="w-4 h-4 text-slate-500" />
+            <span>Feb 10, 2026</span>
           </div>
-        </CardHeader>
-        <CardContent>
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-border">
-                  <th className="text-left py-3 px-4 text-xs font-medium text-muted-foreground uppercase">Report ID</th>
-                  <th className="text-left py-3 px-4 text-xs font-medium text-muted-foreground uppercase">Name</th>
-                  <th className="text-left py-3 px-4 text-xs font-medium text-muted-foreground uppercase hidden md:table-cell">Type</th>
-                  <th className="text-left py-3 px-4 text-xs font-medium text-muted-foreground uppercase hidden lg:table-cell">Date</th>
-                  <th className="text-left py-3 px-4 text-xs font-medium text-muted-foreground uppercase">Status</th>
-                  <th className="text-left py-3 px-4 text-xs font-medium text-muted-foreground uppercase hidden md:table-cell">Size</th>
-                  <th className="text-right py-3 px-4 text-xs font-medium text-muted-foreground uppercase">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredReports.map((report) => (
-                  <tr key={report.id} className="border-b border-border/50 hover:bg-muted/30 transition-colors">
-                    <td className="py-3 px-4 text-sm font-mono text-muted-foreground">{report.id}</td>
-                    <td className="py-3 px-4">
-                      <span className="font-medium text-foreground">{report.name}</span>
-                    </td>
-                    <td className="py-3 px-4 hidden md:table-cell">
-                      <Badge variant="outline">{report.type}</Badge>
-                    </td>
-                    <td className="py-3 px-4 text-sm text-muted-foreground hidden lg:table-cell">{report.date}</td>
-                    <td className="py-3 px-4">
-                      <Badge 
-                        variant={report.status === "Ready" ? "success" : "secondary"}
-                        className="text-xs"
-                      >
-                        {report.status}
-                      </Badge>
-                    </td>
-                    <td className="py-3 px-4 text-sm text-muted-foreground hidden md:table-cell">{report.size}</td>
-                    <td className="py-3 px-4 text-right">
-                      <div className="flex items-center justify-end gap-1">
-                        {report.status === "Ready" && (
-                          <Button variant="ghost" size="sm">
-                            <Download className="w-4 h-4" />
-                          </Button>
-                        )}
-                        <Button variant="ghost" size="sm">
-                          <MoreHorizontal className="w-4 h-4" />
-                        </Button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </CardContent>
-      </Card>
-    </div>
+          <button className="p-2.5 rounded-full bg-slate-100 dark:bg-slate-800/50 hover:bg-slate-200 transition-colors">
+            <Bell className="w-5 h-5" />
+          </button>
+          <button className="flex items-center gap-2 bg-black text-white dark:bg-white dark:text-black px-5 py-2.5 rounded-full text-sm font-semibold hover:opacity-90 transition-opacity whitespace-nowrap shadow-xl">
+            <Download className="w-4 h-4" />
+            <span className="hidden sm:inline">Export Status</span>
+          </button>
+        </div>
+      </header>
+
+      {/* KPI Grid with Wobble Cards */}
+      <section aria-label="Key Performance Indicators">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 relative z-10 w-full mb-10">
+          {kpiCards.map((kpi, index) => {
+            const Icon = kpi.icon;
+            return (
+              <WobbleCard key={index} containerClassName={cn("col-span-1 h-full min-h-[200px] shadow-lg", kpi.color)}>
+                <div className="flex justify-between items-start mb-6">
+                  <div className="p-3 bg-white/10 rounded-xl backdrop-blur-sm">
+                    <Icon className="w-6 h-6 text-white" />
+                  </div>
+                  <div className="flex items-center gap-1 bg-white/20 text-white px-2 py-1 rounded-md text-xs font-semibold backdrop-blur-sm">
+                    <TrendingUp className="w-3 h-3" />
+                    {kpi.change}
+                  </div>
+                </div>
+                <div className="text-4xl font-bold text-white tracking-tight mb-2">
+                  <NumberTicker value={kpi.value} />
+                  {kpi.label === "AI Accuracy Rate" || kpi.label === "System Load" ? "%" : ""}
+                </div>
+                <p className="text-sm text-white/80 font-medium">
+                  {kpi.label}
+                </p>
+              </WobbleCard>
+            );
+          })}
+        </div>
+      </section>
+
+      {/* Interactive Sticky Scroll Section for Analytics */}
+      <section aria-label="System Analytics">
+        <div className="mt-12 rounded-3xl overflow-hidden border border-slate-200 dark:border-white/10 shadow-2xl bg-slate-50 dark:bg-black w-full relative z-20">
+          <StickyScroll content={content} contentClassName="rounded-2xl" />
+        </div>
+      </section>
+
+      {/* Quick Actions / Focus Cards */}
+      <section aria-labelledby="quick-actions-heading" className="mt-16">
+        <h2 id="quick-actions-heading" className="text-2xl font-bold mb-6 text-slate-900 dark:text-white">Quick Actions</h2>
+        <FocusCards cards={quickActions} />
+      </section>
+
+    </main>
   );
 }

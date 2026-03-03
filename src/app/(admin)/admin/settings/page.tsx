@@ -1,16 +1,13 @@
 "use client";
 
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Switch } from "@/components/ui/switch";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { Card, CardBody, CardHeader, Switch, Button, Input } from "@heroui/react";
 import { useTheme } from "next-themes";
 import { useAuth } from "@/lib/auth-context";
-import { 
-  Moon, 
-  Sun, 
-  Bell, 
-  Shield, 
+import {
+  Moon,
+  Sun,
+  Bell,
+  Shield,
   Database,
   Server,
   Key,
@@ -34,8 +31,8 @@ export default function AdminSettingsPage() {
           description: "Toggle dark/light theme",
           action: (
             <Switch
-              checked={theme === "dark"}
-              onCheckedChange={(checked) => setTheme(checked ? "dark" : "light")}
+              isSelected={theme === "dark"}
+              onValueChange={(isSelected) => setTheme(isSelected ? "dark" : "light")}
             />
           ),
         },
@@ -48,13 +45,13 @@ export default function AdminSettingsPage() {
           icon: Bell,
           label: "System Alerts",
           description: "Critical system notifications",
-          action: <Switch defaultChecked />,
+          action: <Switch defaultSelected />,
         },
         {
           icon: Bell,
           label: "User Activity",
           description: "New user registrations & activity",
-          action: <Switch defaultChecked />,
+          action: <Switch defaultSelected />,
         },
       ],
     },
@@ -65,7 +62,7 @@ export default function AdminSettingsPage() {
           icon: Shield,
           label: "Two-Factor Auth",
           description: "Require 2FA for admin access",
-          action: <Switch defaultChecked />,
+          action: <Switch defaultSelected />,
         },
         {
           icon: Key,
@@ -114,17 +111,16 @@ export default function AdminSettingsPage() {
           {settingsGroups.slice(0, 2).map((group) => (
             <Card key={group.title}>
               <CardHeader className="pb-2">
-                <CardTitle className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                   {group.title}
-                </CardTitle>
+                </h3>
               </CardHeader>
-              <CardContent className="p-0">
+              <CardBody className="p-0">
                 {group.items.map((item, index) => (
                   <div
                     key={item.label}
-                    className={`flex items-center justify-between p-4 ${
-                      index !== group.items.length - 1 ? "border-b border-border" : ""
-                    }`}
+                    className={`flex items-center justify-between p-4 ${index !== group.items.length - 1 ? "border-b border-border" : ""
+                      }`}
                   >
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 rounded-xl bg-muted flex items-center justify-center">
@@ -138,7 +134,7 @@ export default function AdminSettingsPage() {
                     {item.action}
                   </div>
                 ))}
-              </CardContent>
+              </CardBody>
             </Card>
           ))}
         </div>
@@ -148,17 +144,16 @@ export default function AdminSettingsPage() {
           {settingsGroups.slice(2).map((group) => (
             <Card key={group.title}>
               <CardHeader className="pb-2">
-                <CardTitle className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                   {group.title}
-                </CardTitle>
+                </h3>
               </CardHeader>
-              <CardContent className="p-0">
+              <CardBody className="p-0">
                 {group.items.map((item, index) => (
                   <div
                     key={item.label}
-                    className={`flex items-center justify-between p-4 cursor-pointer hover:bg-muted/30 transition-colors ${
-                      index !== group.items.length - 1 ? "border-b border-border" : ""
-                    }`}
+                    className={`flex items-center justify-between p-4 cursor-pointer hover:bg-muted/30 transition-colors ${index !== group.items.length - 1 ? "border-b border-border" : ""
+                      }`}
                   >
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 rounded-xl bg-muted flex items-center justify-center">
@@ -172,31 +167,31 @@ export default function AdminSettingsPage() {
                     {item.action}
                   </div>
                 ))}
-              </CardContent>
+              </CardBody>
             </Card>
           ))}
 
           {/* Quick Actions */}
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+              <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                 Quick Actions
-              </CardTitle>
+              </h3>
             </CardHeader>
-            <CardContent className="space-y-3">
-              <Button className="w-full justify-start" variant="outline">
-                <Save className="w-4 h-4 mr-2" />
+            <CardBody className="space-y-3">
+              <Button className="w-full justify-start" variant="flat" startContent={<Save className="w-4 h-4" />}>
                 Export Configuration
               </Button>
-              <Button 
-                variant="outline" 
-                className="w-full justify-start text-destructive hover:text-destructive"
-                onClick={logout}
+              <Button
+                variant="flat"
+                color="danger"
+                className="w-full justify-start"
+                onPress={logout}
+                startContent={<LogOut className="w-4 h-4" />}
               >
-                <LogOut className="w-4 h-4 mr-2" />
                 Sign Out
               </Button>
-            </CardContent>
+            </CardBody>
           </Card>
 
           <p className="text-center text-xs text-muted-foreground">

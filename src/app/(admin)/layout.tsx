@@ -10,9 +10,11 @@ export default function AdminLayout({
 }) {
   return (
     <AuthGuard allowedRoles={["admin"]}>
-      <ResponsiveLayout layoutMode="sidebar">
-        {children}
-      </ResponsiveLayout>
+      <div className="light text-foreground bg-background min-h-screen">
+        <ResponsiveLayout layoutMode="sidebar">
+          {children}
+        </ResponsiveLayout>
+      </div>
     </AuthGuard>
   );
 }
