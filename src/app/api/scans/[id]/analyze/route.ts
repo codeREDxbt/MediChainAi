@@ -3,6 +3,7 @@ import { jwtVerify } from "jose";
 import { cookies } from "next/headers";
 import { supabaseServer } from "@/lib/supabase";
 import { getJwtSecret } from "@/lib/jwt";
+import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
 import { Connection, Keypair, PublicKey, clusterApiUrl } from "@solana/web3.js";
 import { getOrCreateAssociatedTokenAccount, mintTo } from "@solana/spl-token";
 import bs58 from "bs58";
@@ -513,6 +514,25 @@ export async function POST(
 
     if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const ip = getClientIp(req);
+    const ipRateLimit = checkRateLimit(`vision:${ip}`, {
+      windowMs: 60 * 60 * 1000,
+      maxRequests: 20,
+    });
+
+    if (!ipRateLimit.success) {
+      return NextResponse.json({ error: "Too many analysis requests. Please try again later." }, { status: 429 });
+    }
+
+    const userRateLimit = checkRateLimit(`vision-user:${userId}`, {
+      windowMs: 60 * 60 * 1000,
+      maxRequests: 10,
+    });
+
+    if (!userRateLimit.success) {
+      return NextResponse.json({ error: "Hourly analysis quota exceeded." }, { status: 429 });
     }
 
     const { id: scanId } = await params;

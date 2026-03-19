@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { jwtVerify } from "jose";
 import { cookies } from "next/headers";
-import { supabase } from "@/lib/supabase";
+import { supabaseServer } from "@/lib/supabase";
 import { getJwtSecret } from "@/lib/jwt";
 
 export const dynamic = 'force-dynamic';
@@ -22,7 +22,7 @@ export async function GET() {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
         }
 
-        const { data: scans, error: scansError } = await supabase
+        const { data: scans, error: scansError } = await supabaseServer
             .from('scans')
             .select('id, upload_date, status, analysis_results(confidence_score)')
             .eq('user_id', userId)
@@ -61,7 +61,7 @@ export async function GET() {
         
         const localRound = totalScans > 0 ? totalScans : 1;
         
-        const totalUsersResult = await supabase
+        const totalUsersResult = await supabaseServer
             .from('users')
             .select('id', { count: 'exact' });
         const totalUsers = totalUsersResult.count || 1;

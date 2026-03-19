@@ -1,0 +1,48 @@
+version: "3.9"
+
+services:
+  # ── MONAI Python Inference Microservice ──────────────────────────────────
+  monai-service:
+    build:
+      context: ./monai-service
+      dockerfile: Dockerfile
+    container_name: medichain-monai
+    ports:
+      - "8000:8000"
+    volumes:
+      # Persist downloaded model bundles between restarts (~200–400 MB each)
+      - monai_model_cache:/app/.model_cache
+    environment:
+      - PORT=8000
+      - RELOAD=false
+      - MONAI_PRELOAD_MODEL=true
+      - NEXTJS_ORIGIN=http://localhost:3000
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 10s
+      start_period: 90s   # extra time for first-run model download
+      retries: 3
+    restart: unless-stopped
+
+  # ── Next.js Application ───────────────────────────────────────────────────
+  # Uncomment this block to run the full stack with Docker Compose.
+  # For local development, run Next.js with `npm run dev` instead.
+  #
+  # nextjs:
+  #   build:
+  #     context: .
+  #     dockerfile: Dockerfile.nextjs
+  #   container_name: medichain-nextjs
+  #   ports:
+  #     - "3000:3000"
+  #   environment:
+  #     - MONAI_SERVICE_URL=http://monai-service:8000
+  #   depends_on:
+  #     monai-service:
+  #       condition: service_healthy
+  #   restart: unless-stopped
+
+volumes:
+  monai_model_cache:
+    driver: local

@@ -151,12 +151,19 @@ export default function PatientDashboardPage() {
     async function loadStats() {
       try {
         const res = await fetch('/api/dashboard/stats');
-        if (res.ok) {
-          const data = await res.json();
-          setStats(data.stats);
+        if (!res.ok) {
+          throw new Error(`Stats request failed with status ${res.status}`);
         }
+
+        const data = await res.json();
+        if (!Array.isArray(data?.stats)) {
+          throw new Error("Invalid stats payload");
+        }
+
+        setStats(data.stats);
       } catch (e) {
         console.error("Failed to load stats", e);
+        setStats(null);
       } finally {
         setIsLoading(false);
       }
@@ -214,6 +221,10 @@ export default function PatientDashboardPage() {
               <motion.div variants={itemVariants} className="col-span-1 lg:col-span-3 flex items-center justify-center p-8 bg-card rounded-xl border border-border shadow-sm">
                 <Loader2 className="w-6 h-6 animate-spin text-primary" />
                 <span className="ml-2 text-muted-foreground text-sm">Loading on-chain stats...</span>
+              </motion.div>
+            ) : !stats ? (
+              <motion.div variants={itemVariants} className="col-span-1 lg:col-span-3 flex items-center justify-center p-8 bg-card rounded-xl border border-border shadow-sm">
+                <span className="text-muted-foreground text-sm">Unable to load live dashboard stats right now.</span>
               </motion.div>
             ) : (
               stats?.map((metric, index) => {

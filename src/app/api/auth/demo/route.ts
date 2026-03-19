@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { SignJWT } from "jose";
 import { cookies } from "next/headers";
-import { supabase } from "@/lib/supabase";
+import { supabaseServer } from "@/lib/supabase";
 import { getJwtSecret } from "@/lib/jwt";
 import { demoLoginSchema } from "@/lib/validation";
 
@@ -25,7 +25,7 @@ export async function POST(req: Request) {
             : "DemoPatient_" + process.env.NEXT_PUBLIC_SUPABASE_URL?.slice(0, 10).replace(/[^a-zA-Z0-9]/g, '_');
 
         // Find existing user
-        const { data: existingUser, error: findError } = await supabase
+        const { data: existingUser, error: findError } = await supabaseServer
             .from('users')
             .select('*')
             .eq('wallet_address', demoAddress)
@@ -40,7 +40,7 @@ export async function POST(req: Request) {
 
         // Create user if not exists
         if (!user) {
-            const { data: newUser, error: createError } = await supabase
+            const { data: newUser, error: createError } = await supabaseServer
                 .from('users')
                 .insert([{
                     wallet_address: demoAddress,

@@ -27,25 +27,16 @@
         "./src/*"
       ],
       "@/components/*": [
-        "./src/frontend/components/*"
+        "./src/components/*"
       ],
       "@/hooks/*": [
-        "./src/frontend/hooks/*"
+        "./src/hooks/*"
       ],
       "@/lib/*": [
-        "./src/backend/lib/*"
-      ],
-      "@/fonts/*": [
-        "./src/frontend/fonts/*"
+        "./src/lib/*"
       ],
       "@/types/*": [
-        "./src/frontend/types/*"
-      ],
-      "@/frontend/*": [
-        "./src/frontend/*"
-      ],
-      "@/backend/*": [
-        "./src/backend/*"
+        "./src/types/*"
       ]
     },
     "baseUrl": "."

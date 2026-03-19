@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { jwtVerify } from "jose";
 import { cookies } from "next/headers";
-import { supabase } from "@/lib/supabase";
+import { supabaseServer } from "@/lib/supabase";
 import { getJwtSecret } from "@/lib/jwt";
 
 export const dynamic = 'force-dynamic';
@@ -44,7 +44,7 @@ export async function PATCH(req: Request) {
 
     updateData.updated_at = new Date().toISOString();
 
-    const { data: user, error } = await supabase
+    const { data: user, error } = await supabaseServer
       .from('users')
       .update(updateData)
       .eq('id', userId)

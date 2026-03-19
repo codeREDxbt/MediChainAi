@@ -17,6 +17,7 @@ import {
 import { AnimatedTooltip } from "@/components/ui/animated-tooltip";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
+import Image from "next/image";
 
 // Mock patient data with enhanced fields
 const mockPatients = [
@@ -115,12 +116,12 @@ export default function AdminPatientsPage() {
 
   const filteredPatients = mockPatients.filter((patient) => {
     const matchesSearch =
-      patient.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      patient.id.toLowerCase().includes(searchQuery.toLowerCase());
+      (patient.name && patient.name.toLowerCase().includes(searchQuery.toLowerCase())) ||
+      (patient.id && patient.id.toLowerCase().includes(searchQuery.toLowerCase()));
 
     const matchesScanType =
       selectedScanType === "All Scans" ||
-      patient.lastScan.toLowerCase().includes(selectedScanType.toLowerCase());
+      (patient.lastScan && patient.lastScan.toLowerCase().includes(selectedScanType.toLowerCase()));
 
     const matchesRisk =
       selectedRisk === "All Risk Levels" ||
@@ -246,7 +247,7 @@ export default function AdminPatientsPage() {
                         <td className="px-6 py-5">
                           <div className="flex items-center gap-4">
                             {patient.image ? (
-                              <img src={patient.image} alt={patient.name} className="w-10 h-10 rounded-full object-cover border border-white/10 shadow-sm" />
+                              <Image src={patient.image} alt={patient.name} width={40} height={40} className="w-10 h-10 rounded-full object-cover border border-white/10 shadow-sm" />
                             ) : (
                               <div className="w-10 h-10 rounded-full bg-slate-800 flex items-center justify-center text-sm font-bold text-slate-300 border border-white/10 shadow-sm">
                                 {patient.avatar}

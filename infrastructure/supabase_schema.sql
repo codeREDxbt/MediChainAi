@@ -42,9 +42,100 @@ alter table public.users enable row level security;
 alter table public.scans enable row level security;
 alter table public.analysis_results enable row level security;
 
--- 5. Create Policies (We handle auth in API routes, so allow service_role access)
--- Note: Supabase Service Role Key bypasses RLS, but for client access we need policies.
--- For simplicity in development, allow public access via API key (Authenticated/Anon).
-create policy "Enable all access for all users" on public.users for all using (true) with check (true);
-create policy "Enable all access for all users" on public.scans for all using (true) with check (true);
-create policy "Enable all access for all users" on public.analysis_results for all using (true) with check (true);
+-- 5. Secure policies (owner-scoped)
+-- Service role bypasses RLS, so backend API routes can still operate as designed.
+
+drop policy if exists "Enable all access for all users" on public.users;
+drop policy if exists "Enable all access for all users" on public.scans;
+drop policy if exists "Enable all access for all users" on public.analysis_results;
+
+drop policy if exists "Users can view own profile" on public.users;
+drop policy if exists "Users can insert own profile" on public.users;
+drop policy if exists "Users can update own profile" on public.users;
+
+create policy "Users can view own profile"
+  on public.users for select
+  using (auth.uid() = id);
+
+create policy "Users can insert own profile"
+  on public.users for insert
+  with check (auth.uid() = id);
+
+create policy "Users can update own profile"
+  on public.users for update
+  using (auth.uid() = id)
+  with check (auth.uid() = id);
+
+drop policy if exists "Users can view own scans" on public.scans;
+drop policy if exists "Users can insert own scans" on public.scans;
+drop policy if exists "Users can update own scans" on public.scans;
+drop policy if exists "Users can delete own scans" on public.scans;
+
+create policy "Users can view own scans"
+  on public.scans for select
+  using (auth.uid() = user_id);
+
+create policy "Users can insert own scans"
+  on public.scans for insert
+  with check (auth.uid() = user_id);
+
+create policy "Users can update own scans"
+  on public.scans for update
+  using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
+
+create policy "Users can delete own scans"
+  on public.scans for delete
+  using (auth.uid() = user_id);
+
+drop policy if exists "Users can view own analysis" on public.analysis_results;
+drop policy if exists "Users can insert own analysis" on public.analysis_results;
+drop policy if exists "Users can update own analysis" on public.analysis_results;
+drop policy if exists "Users can delete own analysis" on public.analysis_results;
+
+create policy "Users can view own analysis"
+  on public.analysis_results for select
+  using (
+    exists (
+      select 1 from public.scans s
+      where s.id = analysis_results.scan_id
+        and s.user_id = auth.uid()
+    )
+  );
+
+create policy "Users can insert own analysis"
+  on public.analysis_results for insert
+  with check (
+    exists (
+      select 1 from public.scans s
+      where s.id = analysis_results.scan_id
+        and s.user_id = auth.uid()
+    )
+  );
+
+create policy "Users can update own analysis"
+  on public.analysis_results for update
+  using (
+    exists (
+      select 1 from public.scans s
+      where s.id = analysis_results.scan_id
+        and s.user_id = auth.uid()
+    )
+  )
+  with check (
+    exists (
+      select 1 from public.scans s
+      where s.id = analysis_results.scan_id
+        and s.user_id = auth.uid()
+    )
+  );
+
+create policy "Users can delete own analysis"
+  on public.analysis_results for delete
+  using (
+    exists (
+      select 1 from public.scans s
+      where s.id = analysis_results.scan_id
+        and s.user_id = auth.uid()
+    )
+  );

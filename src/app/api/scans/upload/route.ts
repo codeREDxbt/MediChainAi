@@ -3,11 +3,14 @@ import { jwtVerify } from "jose";
 import { cookies } from "next/headers";
 import { supabaseServer } from "@/lib/supabase";
 import { getJwtSecret } from "@/lib/jwt";
+import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
 import crypto from "crypto";
 import dicomParser from "dicom-parser";
 import { PNG } from "pngjs";
 
 const IMAGE_EXTENSIONS = new Set(["jpg", "jpeg", "png", "webp", "gif", "bmp"]);
+const ALLOWED_UPLOAD_EXTENSIONS = new Set(["dcm", "nii", "nii.gz", ...IMAGE_EXTENSIONS]);
+const MAX_UPLOAD_BYTES = Number(process.env.MAX_UPLOAD_BYTES || 50 * 1024 * 1024);
 
 const getFileExtension = (fileName: string): string => {
     const lowerName = fileName.toLowerCase();
@@ -111,6 +114,16 @@ const getContentType = (fileName: string, fallback: string): string => {
 
 export async function POST(req: Request) {
     try {
+        const ip = getClientIp(req);
+        const rateLimitResult = checkRateLimit(`upload:${ip}`, {
+            windowMs: 60 * 60 * 1000,
+            maxRequests: 30,
+        });
+
+        if (!rateLimitResult.success) {
+            return NextResponse.json({ error: "Too many uploads. Please try again later." }, { status: 429 });
+        }
+
         const token = (await cookies()).get("token")?.value;
 
         if (!token) {
@@ -136,6 +149,13 @@ export async function POST(req: Request) {
             return NextResponse.json({ error: "No file provided" }, { status: 400 });
         }
 
+        if (file.size > MAX_UPLOAD_BYTES) {
+            return NextResponse.json(
+                { error: `File too large. Max allowed size is ${Math.floor(MAX_UPLOAD_BYTES / (1024 * 1024))}MB.` },
+                { status: 413 }
+            );
+        }
+
         const studyDate = studyDateStr ? new Date(studyDateStr) : null;
 
         // Convert file to buffer and generate hash
@@ -143,6 +163,13 @@ export async function POST(req: Request) {
         const buffer = Buffer.from(arrayBuffer);
         const hash = crypto.createHash("sha256").update(buffer).digest("hex");
         const fileExt = getFileExtension(file.name);
+
+        if (!ALLOWED_UPLOAD_EXTENSIONS.has(fileExt)) {
+            return NextResponse.json(
+                { error: `Unsupported file type '.${fileExt}'.` },
+                { status: 415 }
+            );
+        }
 
         // Use a simple, deterministic filename
         const fileName = `${userId}/${hash.slice(0, 16)}.${fileExt}`;

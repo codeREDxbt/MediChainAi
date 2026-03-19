@@ -126,14 +126,14 @@ export default function MyScansPage() {
   const filteredScans = scans.filter((scan) => {
     const q = searchQuery.toLowerCase();
     const matchesSearch =
-      scan.id.toLowerCase().includes(q) ||
-      scan.region.toLowerCase().includes(q) ||
-      scan.type.toLowerCase().includes(q) ||
+      (scan.id && scan.id.toLowerCase().includes(q)) ||
+      (scan.region && scan.region.toLowerCase().includes(q)) ||
+      (scan.type && scan.type.toLowerCase().includes(q)) ||
       (scan.originalName?.toLowerCase().includes(q) ?? false) ||
       (scan.patientName?.toLowerCase().includes(q) ?? false);
 
     // Normalize type for flexible filter comparison
-    const typeNorm = scan.type?.toLowerCase().replace(/\s+scan$/, '').replace(/^mr$/, 'mri');
+    const typeNorm = (scan.type || "").toLowerCase().replace(/\s+scan$/, '').replace(/^mr$/, 'mri');
     const selectedNorm = selectedType.toLowerCase().replace(/\s+scan$/, '').replace(/^mr$/, 'mri');
     const matchesType = selectedType === "All Types" || typeNorm === selectedNorm || scan.type === selectedType;
     return matchesSearch && matchesType;
@@ -282,21 +282,21 @@ export default function MyScansPage() {
                                   <div className="absolute inset-0 rounded-2xl bg-gradient-to-br from-emerald-500/0 via-emerald-500/0 to-emerald-500/0 group-hover/card:from-emerald-500/5 group-hover/card:via-transparent group-hover/card:to-transparent transition-all duration-500 z-0" />
 
                                   <div className="relative z-10 flex flex-col h-full">
-<div className="absolute top-2 right-2 z-50">
-  <button
-    onClick={(e) => handleDelete(e, scan.id)}
-    disabled={isDeleting === scan.id}
-    className="p-2 rounded-xl bg-slate-900/50 hover:bg-red-500/20 text-slate-500 hover:text-red-400 border border-white/5 hover:border-red-500/30 transition-all duration-200 shadow-xl"
-    aria-label="Delete scan"
-    title="Delete scan"
-  >
-    {isDeleting === scan.id ? (
-      <Loader2 className="w-4 h-4 animate-spin text-red-400" />
-    ) : (
-      <Trash2 className="w-4 h-4" />
-    )}
-  </button>
-</div>
+                                    <div className="absolute top-2 right-2 z-50">
+                                      <button
+                                        onClick={(e) => handleDelete(e, scan.id)}
+                                        disabled={isDeleting === scan.id}
+                                        className="p-2 rounded-xl bg-slate-900/50 hover:bg-red-500/20 text-slate-500 hover:text-red-400 border border-white/5 hover:border-red-500/30 transition-all duration-200 shadow-xl"
+                                        aria-label="Delete scan"
+                                        title="Delete scan"
+                                      >
+                                        {isDeleting === scan.id ? (
+                                          <Loader2 className="w-4 h-4 animate-spin text-red-400" />
+                                        ) : (
+                                          <Trash2 className="w-4 h-4" />
+                                        )}
+                                      </button>
+                                    </div>
                                     <div className="flex items-start justify-between mb-4">
                                       <CardItem
                                         translateZ="40"

@@ -2,7 +2,7 @@
 import { NextResponse } from "next/server";
 import { jwtVerify } from "jose";
 import { cookies } from "next/headers";
-import { supabase } from "@/lib/supabase";
+import { supabaseServer } from "@/lib/supabase";
 import { getJwtSecret } from "@/lib/jwt";
 
 const ALLOWED_MODALITIES = ["CT", "MRI", "X-Ray", "Ultrasound", "PET"] as const;
@@ -29,7 +29,7 @@ export async function GET() {
     }
 
     // Fetch scans from Supabase
-    const { data: scans, error } = await supabase
+    const { data: scans, error } = await supabaseServer
         .from('scans')
         .select('*, analysis_results(*)')
         .eq('user_id', user.sub)
@@ -74,7 +74,7 @@ export async function POST(req: Request) {
         }
 
         // Insert new scan
-        const { data: newScan, error } = await supabase
+        const { data: newScan, error } = await supabaseServer
             .from('scans')
             .insert([{
                 user_id: user.sub,

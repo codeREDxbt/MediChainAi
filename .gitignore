@@ -76,3 +76,10 @@ auth.json
 *~
 .DS_Store
 Thumbs.db
+
+# python virtual environments and caches
+.venv/
+venv/
+monai-service/venv/
+__pycache__/
+*.pyc

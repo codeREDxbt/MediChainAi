@@ -3,7 +3,7 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { SignJWT } from "jose";
-import { supabase } from "@/lib/supabase";
+import { supabaseServer } from "@/lib/supabase";
 import { getJwtSecret } from "@/lib/jwt";
 import nacl from "tweetnacl";
 import bs58 from "bs58";
@@ -64,7 +64,7 @@ export async function POST(req: Request) {
 
         // 2. Find or Create User via Supabase
         let user;
-        const { data: existingUser, error: findError } = await supabase
+        const { data: existingUser, error: findError } = await supabaseServer
             .from('users')
             .select('*')
             .eq('wallet_address', walletAddress)
@@ -79,7 +79,7 @@ export async function POST(req: Request) {
             user = existingUser;
         } else {
             // Create new user with default role
-            const { data: newUser, error: createError } = await supabase
+            const { data: newUser, error: createError } = await supabaseServer
                 .from('users')
                 .insert([{ 
                     wallet_address: walletAddress,
