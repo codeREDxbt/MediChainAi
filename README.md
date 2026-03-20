@@ -15,16 +15,28 @@ A privacy-first medical AI dashboard built with Next.js 15, Tailwind CSS, and sh
 ### Prerequisites
 
 - Node.js 18+ 
+- Python 3.11+ for `monai-service`
+- Docker Desktop if you want to run MONAI with Compose
 - npm or yarn
 
 ### Installation
 
 ```bash
+# Create local env from the example and fill in Supabase/OpenRouter secrets
+copy .env.local.example .env.local
+
 # Install dependencies
 npm install
 
-# Run development server
+# Run the Next.js app
 npm run dev
+
+# In another terminal, start the MONAI service
+cd monai-service
+python -m venv venv
+venv\Scripts\activate
+pip install -r requirements.txt
+uvicorn main:app --host 0.0.0.0 --port 8000 --reload
 ```
 
 Open [http://localhost:3000](http://localhost:3000) to view the app.

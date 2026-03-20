@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { jwtVerify } from "jose";
 import { cookies } from "next/headers";
-import { supabaseServer } from "@/lib/supabase";
+import { isSupabaseConfigured, supabaseServer } from "@/lib/supabase";
 import { getJwtSecret } from "@/lib/jwt";
 import { buildDashboardStats } from "@/lib/dashboard-stats";
 
@@ -24,6 +24,11 @@ export async function GET() {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
         }
 
+        if (!isSupabaseConfigured) {
+            const stats = buildDashboardStats([], []);
+            return NextResponse.json({ stats });
+        }
+
         const { data: scans, error: scansError } = await supabaseServer
             .from('scans')
             .select('id, upload_date')
@@ -36,7 +41,7 @@ export async function GET() {
 
         const { data: analyses, error: analysesError } = await supabaseServer
             .from('scans')
-            .select('analysis_results(confidence_score)')
+            .select('analysis_results(confidence_score, model_source, processed_at)')
             .eq('user_id', userId);
 
         if (analysesError) {

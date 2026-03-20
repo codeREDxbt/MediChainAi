@@ -9,6 +9,7 @@ import { getOrCreateAssociatedTokenAccount, mintTo } from "@solana/spl-token";
 import bs58 from "bs58";
 import dicomParser from "dicom-parser";
 import { PNG } from "pngjs";
+import { hasAnalysisSource } from "@/lib/analysis-results";
 
 const VISION_MODEL = "meta-llama/llama-3.2-11b-vision-instruct";
 
@@ -557,14 +558,7 @@ export async function POST(
       return NextResponse.json({ error: "Scan not found or unauthorized" }, { status: 404 });
     }
 
-    const existingAnalysis = Array.isArray(scan.analysis_results)
-      ? scan.analysis_results[0]
-      : scan.analysis_results;
-    const hasAnalysis = !!existingAnalysis;
-
-    if (hasAnalysis) {
-      return NextResponse.json({ error: "Scan is already analyzed" }, { status: 400 });
-    }
+    const hadNarrativeAnalysis = hasAnalysisSource(scan.analysis_results, "openrouter");
 
     // Pick an AI-compatible file path. Prefer converted image for non-image uploads.
     const originalFilePath = scan.file_hash as string;
@@ -619,10 +613,13 @@ export async function POST(
     // Save Analysis Results to Supabase
     const { data: analysis, error: analysisError } = await supabaseServer
       .from('analysis_results')
-      .insert({
+      .upsert({
         scan_id: scan.id,
         confidence_score: aiAnalysis.confidence,
-        findings: aiAnalysis.findings
+        findings: aiAnalysis.findings,
+        model_source: "openrouter",
+      }, {
+        onConflict: "scan_id,model_source",
       })
       .select()
       .single();
@@ -642,11 +639,11 @@ export async function POST(
       console.error("Scan update error:", updateError);
     }
 
-    // Attempt Solana Devnet Reward
+    // Only mint reward on the first narrative analysis for a scan.
     const adminKeyBase58 = process.env.SOLANA_ADMIN_PRIVATE_KEY;
     const testMintStr = process.env.NEXT_PUBLIC_MCI_TOKEN_MINT;
 
-    if (adminKeyBase58 && testMintStr && walletAddress) {
+    if (!hadNarrativeAnalysis && adminKeyBase58 && testMintStr && walletAddress) {
       try {
         const adminKeypair = Keypair.fromSecretKey(bs58.decode(adminKeyBase58));
         const connection = new Connection(clusterApiUrl('devnet'), 'confirmed');
@@ -668,6 +665,8 @@ export async function POST(
         console.error("Auto Reward Error:", mintError);
         txHashText = "Reward calculation failed - AI analysis succeeded";
       }
+    } else if (hadNarrativeAnalysis) {
+      txHashText = "Existing narrative analysis refreshed - no additional reward minted";
     } else {
       txHashText = "Minting not configured - AI analysis succeeded";
     }
@@ -677,7 +676,9 @@ export async function POST(
       analysis,
       rewardTxHash: txHashText,
       tokenMinted: tokenMintSuccessful,
-      message: "AI analysis complete using Vision AI"
+      message: hadNarrativeAnalysis
+        ? "AI analysis refreshed using Vision AI"
+        : "AI analysis complete using Vision AI"
     });
 
   } catch (error) {

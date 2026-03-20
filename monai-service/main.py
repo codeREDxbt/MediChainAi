@@ -17,6 +17,7 @@ import os
 import secrets
 import time
 from contextlib import asynccontextmanager
+from pathlib import Path
 from typing import Any
 
 import uvicorn
@@ -25,7 +26,12 @@ from fastapi import FastAPI, File, Form, Header, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-load_dotenv()
+SERVICE_DIR = Path(__file__).resolve().parent
+REPO_ROOT = SERVICE_DIR.parent
+
+load_dotenv(REPO_ROOT / ".env.local")
+load_dotenv(REPO_ROOT / ".env")
+load_dotenv(SERVICE_DIR / ".env")
 
 logging.basicConfig(
     level=logging.INFO,

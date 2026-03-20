@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
 import { SignJWT } from "jose";
 import { cookies } from "next/headers";
-import { supabaseServer } from "@/lib/supabase";
+import { isSupabaseConfigured, supabaseServer } from "@/lib/supabase";
 import { getJwtSecret } from "@/lib/jwt";
 import { demoLoginSchema } from "@/lib/validation";
+import { buildLocalDemoUser, toAuthUser } from "@/lib/auth-local";
 
 export const dynamic = 'force-dynamic';
 
@@ -19,48 +20,54 @@ export async function POST(req: Request) {
 
         const body = await req.json();
         const { role } = demoLoginSchema.parse(body);
+        let user = buildLocalDemoUser(role);
 
-        const demoAddress = role === "admin"
-            ? "DemoAdmin_" + process.env.NEXT_PUBLIC_SUPABASE_URL?.slice(0, 10).replace(/[^a-zA-Z0-9]/g, '_')
-            : "DemoPatient_" + process.env.NEXT_PUBLIC_SUPABASE_URL?.slice(0, 10).replace(/[^a-zA-Z0-9]/g, '_');
+        if (isSupabaseConfigured) {
+            const supabaseProjectSlug = process.env.NEXT_PUBLIC_SUPABASE_URL
+                ?.replace(/^https?:\/\//, "")
+                .split(".")[0]
+                ?.replace(/[^a-zA-Z0-9]/g, "_") || "local";
+            const demoAddress = role === "admin"
+                ? `DemoAdmin_${supabaseProjectSlug}`
+                : `DemoPatient_${supabaseProjectSlug}`;
 
-        // Find existing user
-        const { data: existingUser, error: findError } = await supabaseServer
-            .from('users')
-            .select('*')
-            .eq('wallet_address', demoAddress)
-            .single();
-
-        let user = existingUser;
-
-        if (findError && findError.code !== 'PGRST116') {
-            console.error("Supabase find error:", findError);
-            return NextResponse.json({ error: "Database error" }, { status: 500 });
-        }
-
-        // Create user if not exists
-        if (!user) {
-            const { data: newUser, error: createError } = await supabaseServer
+            const { data: existingUser, error: findError } = await supabaseServer
                 .from('users')
-                .insert([{
-                    wallet_address: demoAddress,
-                    username: `Demo ${role}`,
-                    role: role
-                }])
-                .select()
+                .select('*')
+                .eq('wallet_address', demoAddress)
                 .single();
 
-            if (createError) {
-                console.error("Supabase create error:", createError);
-                return NextResponse.json({ error: "Failed to create user" }, { status: 500 });
+            if (findError && findError.code !== 'PGRST116') {
+                console.error("Supabase find error:", findError);
+                return NextResponse.json({ error: "Database error" }, { status: 500 });
             }
-            user = newUser;
+
+            if (existingUser) {
+                user = existingUser;
+            } else {
+                const { data: newUser, error: createError } = await supabaseServer
+                    .from('users')
+                    .insert([{
+                        wallet_address: demoAddress,
+                        username: role === "admin" ? "Demo Admin" : "Demo Patient",
+                        role,
+                    }])
+                    .select()
+                    .single();
+
+                if (createError) {
+                    console.error("Supabase create error:", createError);
+                    return NextResponse.json({ error: "Failed to create user" }, { status: 500 });
+                }
+                user = newUser;
+            }
         }
 
         // Create JWT
         const secret = getJwtSecret();
         const token = await new SignJWT({ 
             sub: user.id,
+            name: user.username || "Anonymous",
             walletAddress: user.wallet_address,
             role: user.role
         })
@@ -79,12 +86,7 @@ export async function POST(req: Request) {
         });
 
         return NextResponse.json({
-            user: {
-                id: user.id,
-                name: user.username,
-                address: user.wallet_address,
-                role: user.role
-            }
+            user: toAuthUser(user),
         });
     } catch (error) {
         console.error("Demo login error:", error);

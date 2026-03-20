@@ -31,11 +31,15 @@ create table public.scans (
 -- 3. Create Analysis Results Table
 create table public.analysis_results (
   id uuid default gen_random_uuid() primary key,
-  scan_id uuid not null unique references public.scans(id),
+  scan_id uuid not null references public.scans(id),
   confidence_score double precision,
   findings jsonb,
+  model_source text not null default 'openrouter',
   processed_at timestamp with time zone default timezone('utc'::text, now()) not null
 );
+
+create unique index if not exists analysis_results_scan_id_model_source_key
+  on public.analysis_results (scan_id, model_source);
 
 -- 4. Enable Row Level Security (RLS)
 alter table public.users enable row level security;

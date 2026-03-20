@@ -1,6 +1,6 @@
 @echo off
 echo ==========================================
-echo    MediChainAI Setup & Startup Script
+echo    MediChainAI Setup ^& Startup Script
 echo ==========================================
 echo.
 
@@ -26,7 +26,7 @@ echo.
 echo [2/2] Starting development server...
 echo.
 echo Opening app in browser...
-start http://localhost:3000
+start "" "http://localhost:3000"
 
 call npm run dev
 pause

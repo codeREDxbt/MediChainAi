@@ -3,12 +3,13 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { SignJWT } from "jose";
-import { supabaseServer } from "@/lib/supabase";
+import { isSupabaseConfigured, supabaseServer } from "@/lib/supabase";
 import { getJwtSecret } from "@/lib/jwt";
 import nacl from "tweetnacl";
 import bs58 from "bs58";
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
 import { loginSchema } from "@/lib/validation";
+import { buildLocalWalletUser, toAuthUser } from "@/lib/auth-local";
 
 export async function POST(req: Request) {
     try {
@@ -64,35 +65,38 @@ export async function POST(req: Request) {
 
         // 2. Find or Create User via Supabase
         let user;
-        const { data: existingUser, error: findError } = await supabaseServer
-            .from('users')
-            .select('*')
-            .eq('wallet_address', walletAddress)
-            .single();
-
-        if (findError && findError.code !== 'PGRST116') { // PGRST116 = not found
-            console.error("Supabase find error:", findError);
-            return NextResponse.json({ error: `Database error: ${findError.message} (Code: ${findError.code})` }, { status: 500 });
-        }
-
-        if (existingUser) {
-            user = existingUser;
+        if (!isSupabaseConfigured) {
+            user = buildLocalWalletUser(walletAddress);
         } else {
-            // Create new user with default role
-            const { data: newUser, error: createError } = await supabaseServer
+            const { data: existingUser, error: findError } = await supabaseServer
                 .from('users')
-                .insert([{ 
-                    wallet_address: walletAddress,
-                    role: "patient" // Default role for new users
-                }])
-                .select()
+                .select('*')
+                .eq('wallet_address', walletAddress)
                 .single();
 
-            if (createError) {
-                console.error("Supabase create error:", createError);
-                return NextResponse.json({ error: `Failed to create user: ${createError.message}` }, { status: 500 });
+            if (findError && findError.code !== 'PGRST116') { // PGRST116 = not found
+                console.error("Supabase find error:", findError);
+                return NextResponse.json({ error: `Database error: ${findError.message} (Code: ${findError.code})` }, { status: 500 });
             }
-            user = newUser;
+
+            if (existingUser) {
+                user = existingUser;
+            } else {
+                const { data: newUser, error: createError } = await supabaseServer
+                    .from('users')
+                    .insert([{ 
+                        wallet_address: walletAddress,
+                        role: "patient"
+                    }])
+                    .select()
+                    .single();
+
+                if (createError) {
+                    console.error("Supabase create error:", createError);
+                    return NextResponse.json({ error: `Failed to create user: ${createError.message}` }, { status: 500 });
+                }
+                user = newUser;
+            }
         }
 
         // 3. Create Session (JWT) using jose
@@ -100,6 +104,7 @@ export async function POST(req: Request) {
 
         const token = await new SignJWT({
             sub: user.id,
+            name: user.username || "Anonymous",
             walletAddress: user.wallet_address,
             role: user.role
         })
@@ -109,12 +114,7 @@ export async function POST(req: Request) {
             .sign(secret);
 
         // 4. Return formatted user
-        const authUser = {
-            id: user.id,
-            name: user.username || "Anonymous",
-            address: user.wallet_address,
-            role: user.role
-        };
+        const authUser = toAuthUser(user);
 
         const response = NextResponse.json({ user: authUser, token });
 

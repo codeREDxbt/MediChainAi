@@ -3,6 +3,10 @@ import { jwtVerify } from "jose";
 import { cookies } from "next/headers";
 import { supabaseServer } from "@/lib/supabase";
 import { getJwtSecret } from "@/lib/jwt";
+import {
+    buildPresentationAnalysis,
+    normalizeAnalysisResults,
+} from "@/lib/analysis-results";
 
 export const dynamic = 'force-dynamic';
 
@@ -38,9 +42,9 @@ export async function GET(
             return NextResponse.json({ error: "Scan not found" }, { status: 404 });
         }
 
-        const analysis = Array.isArray(scan.analysis_results)
-            ? scan.analysis_results[0]
-            : scan.analysis_results;
+        const analyses = normalizeAnalysisResults(scan.analysis_results);
+        const analysis = buildPresentationAnalysis(analyses);
+        const confidenceScore = analysis?.confidence_score ?? 0;
         const isImage = (() => {
             const ext = scan.file_hash?.split('.').pop()?.toLowerCase();
             return ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp'].includes(ext || '');
@@ -54,17 +58,19 @@ export async function GET(
             patientName: scan.patient_name,
             studyDate: scan.study_date,
             seriesDesc: scan.series_description,
-            riskScore: analysis?.confidence_score ? Math.round(analysis.confidence_score) : 0,
-            riskLevel: analysis?.confidence_score && analysis.confidence_score > 85 ? "High" as const : "Low" as const,
+            riskScore: analysis ? Math.round(confidenceScore) : 0,
+            riskLevel: analysis && confidenceScore > 85 ? "High" as const : "Low" as const,
             findings: analysis?.findings ? JSON.stringify(analysis.findings) : "Pending Analysis",
-            confidence: analysis?.confidence_score ? Math.round(analysis.confidence_score) : 0,
-            aiScore: analysis?.confidence_score ? Math.round(analysis.confidence_score) : 0,
+            confidence: analysis ? Math.round(confidenceScore) : 0,
+            aiScore: analysis ? Math.round(confidenceScore) : 0,
             txHash: scan.file_hash,
             timestamp: scan.upload_date,
             date: scan.upload_date,
             imageUrl: isImage ? `/api/scans/${scan.id}/image` : `/api/scans/${scan.id}/image`,
             convertedImageUrl: scan.converted_image ? `/api/scans/${scan.id}/image?converted=true` : null,
             status: analysis ? "Analyzed" : (scan.status === "Analyzed" ? "Pending Review" : (scan.status || "Pending Review")),
+            analysisSource: analysis?.model_source || null,
+            analysisSources: analyses.map((item) => item.model_source || "openrouter"),
             modality: scan.modality,
             region: scan.modality || scan.series_description || "Medical Scan",
             blockchain: "pending",

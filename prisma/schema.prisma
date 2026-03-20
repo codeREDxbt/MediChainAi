@@ -46,11 +46,13 @@ model Scan {
 
 model AnalysisResult {
   id              String   @id @default(uuid())
-  scanId          String   @unique @map("scan_id")
+  scanId          String   @map("scan_id")
   scan            Scan     @relation(fields: [scanId], references: [id])
   confidenceScore Float?   @map("confidence_score")
   findings        Json?    // Postgres supports native JSON
+  modelSource     String   @default("openrouter") @map("model_source")
   processedAt     DateTime @default(now()) @map("processed_at")
 
+  @@unique([scanId, modelSource])
   @@map("analysis_results")
 }

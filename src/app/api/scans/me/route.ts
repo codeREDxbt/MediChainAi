@@ -1,8 +1,12 @@
 import { NextResponse } from "next/server";
 import { jwtVerify } from "jose";
 import { cookies } from "next/headers";
-import { supabaseServer } from "@/lib/supabase";
+import { isSupabaseConfigured, supabaseServer } from "@/lib/supabase";
 import { getJwtSecret } from "@/lib/jwt";
+import {
+    buildPresentationAnalysis,
+    normalizeAnalysisResults,
+} from "@/lib/analysis-results";
 
 export const dynamic = 'force-dynamic';
 
@@ -22,6 +26,10 @@ export async function GET() {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
         }
 
+        if (!isSupabaseConfigured) {
+            return NextResponse.json({ scans: [] });
+        }
+
         // Fetch user's scans from Supabase
         const { data: scans, error: scansError } = await supabaseServer
             .from('scans')
@@ -35,10 +43,10 @@ export async function GET() {
         }
 
         const formattedScans = scans.map((scan) => {
-            const analysis = Array.isArray(scan.analysis_results)
-                ? scan.analysis_results[0]
-                : scan.analysis_results;
+            const analyses = normalizeAnalysisResults(scan.analysis_results);
+            const analysis = buildPresentationAnalysis(analyses);
             const hasAnalysis = !!analysis;
+            const confidenceScore = analysis?.confidence_score ?? 0;
 
             const isImage = (() => {
                 const ext = scan.file_hash?.split('.').pop()?.toLowerCase();
@@ -50,15 +58,17 @@ export async function GET() {
                 type: scan.modality && scan.modality !== "Unknown" ? scan.modality : "Medical Scan",
                 originalName: scan.original_name || null,
                 patientName: scan.patient_name || null,
-                riskScore: hasAnalysis ? Math.round(analysis.confidence_score) : 0,
-                aiScore: hasAnalysis ? Math.round(analysis.confidence_score) : 0,
-                confidence: hasAnalysis ? Math.round(analysis.confidence_score) : 0,
-                findings: hasAnalysis ? JSON.stringify(analysis.findings) : "Pending Analysis",
+                riskScore: hasAnalysis ? Math.round(confidenceScore) : 0,
+                aiScore: hasAnalysis ? Math.round(confidenceScore) : 0,
+                confidence: hasAnalysis ? Math.round(confidenceScore) : 0,
+                findings: analysis?.findings ? JSON.stringify(analysis.findings) : "Pending Analysis",
                 timestamp: scan.upload_date,
                 date: scan.upload_date,
                 imageUrl: isImage ? `/api/scans/${scan.id}/image` : `/api/scans/${scan.id}/image`,
                 convertedImageUrl: scan.converted_image ? `/api/scans/${scan.id}/image?converted=true` : null,
                 status: hasAnalysis ? "Analyzed" : (scan.status === "Analyzed" ? "Pending Review" : (scan.status || "Pending Review")),
+                analysisSource: analysis?.model_source || null,
+                analysisSources: analyses.map((item) => item.model_source || "openrouter"),
                 blockchain: "pending",
                 size: "N/A",
                 txHash: scan.file_hash || null,

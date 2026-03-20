@@ -22,6 +22,7 @@ import { cookies } from "next/headers";
 import { supabaseServer } from "@/lib/supabase";
 import { getJwtSecret } from "@/lib/jwt";
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
+import { hasAnalysisSource } from "@/lib/analysis-results";
 
 // ── Types ─────────────────────────────────────────────────────────────────
 
@@ -113,17 +114,7 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: "Scan not found or unauthorized" }, { status: 404 });
     }
 
-    // ── 2. Check if already analyzed by MONAI ──────────────────────────────
-    const existing = Array.isArray(scan.analysis_results)
-        ? scan.analysis_results[0]
-        : scan.analysis_results;
-
-    if (existing?.model_source === "monai") {
-        return NextResponse.json(
-            { error: "Scan already has a MONAI analysis result" },
-            { status: 400 }
-        );
-    }
+    const hadMonaiAnalysis = hasAnalysisSource(scan.analysis_results, "monai");
 
     // ── 3. Download file from Supabase Storage ─────────────────────────────
     const filePath = (scan.file_hash as string) || "";
@@ -180,7 +171,7 @@ export async function POST(req: Request) {
     // ── 5. Persist results to Supabase ─────────────────────────────────────
     const { data: analysis, error: insertError } = await supabaseServer
         .from("analysis_results")
-        .insert({
+        .upsert({
             scan_id: scanId,
             confidence_score: monaiResult.confidence,
             findings: {
@@ -193,6 +184,8 @@ export async function POST(req: Request) {
                 segmentation_overlay: monaiResult.segmentation_overlay_base64,
             },
             model_source: "monai",
+        }, {
+            onConflict: "scan_id,model_source",
         })
         .select()
         .single();
@@ -221,6 +214,8 @@ export async function POST(req: Request) {
             inference_seconds: monaiResult.inference_seconds,
             has_overlay: !!monaiResult.segmentation_overlay_base64,
         },
-        message: `MONAI analysis complete using ${monaiResult.model_used}`,
+        message: hadMonaiAnalysis
+            ? `MONAI analysis refreshed using ${monaiResult.model_used}`
+            : `MONAI analysis complete using ${monaiResult.model_used}`,
     });
 }
