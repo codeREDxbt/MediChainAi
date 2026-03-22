@@ -38,27 +38,30 @@ export const BentoGridItem = ({
   icon?: React.ReactNode;
   index?: number;
 }) => {
-  const mouseX = useMotionValue(0);
-  const mouseY = useMotionValue(0);
+	const mouseX = useMotionValue(0);
+	const mouseY = useMotionValue(0);
 
-  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
-    const rect = e.currentTarget.getBoundingClientRect();
-    mouseX.set(e.clientX - rect.left);
-    mouseY.set(e.clientY - rect.top);
-  };
+	const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+		const rect = e.currentTarget.getBoundingClientRect();
+		mouseX.set(e.clientX - rect.left);
+		mouseY.set(e.clientY - rect.top);
+	};
 
-  const spotlightBg = useMotionTemplate`radial-gradient(300px circle at ${mouseX}px ${mouseY}px, rgba(94, 106, 210, 0.15), transparent)`;
+	const spotlightBg = useMotionTemplate`radial-gradient(300px circle at ${mouseX}px ${mouseY}px, rgba(94, 106, 210, 0.15), transparent)`;
 
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 24 }}
-      whileInView={{ opacity: 1, y: 0 }}
-      viewport={{ once: true, margin: "-50px" }}
-      transition={{
-        duration: 0.6,
-        delay: index * 0.08,
-        ease: [0.16, 1, 0.3, 1],
-      }}
+	const isLeftColumn = index === 0 || index === 2 || index === 3;
+	const initialX = isLeftColumn ? -50 : 50;
+
+	return (
+		<motion.div
+			initial={{ opacity: 0, x: initialX }}
+			whileInView={{ opacity: 1, x: 0 }}
+			viewport={{ once: false, amount: 0.2, margin: "0px 0px -100px 0px" }}
+			transition={{
+				duration: 0.6,
+				delay: index * 0.08,
+				ease: [0.16, 1, 0.3, 1],
+			}}
       onMouseMove={handleMouseMove}
       className={cn(
         "group/bento relative overflow-hidden",

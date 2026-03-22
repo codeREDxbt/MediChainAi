@@ -173,12 +173,14 @@ export default function AuthPage() {
               MediChainAI
             </motion.h2>
 
-            <div className="mt-4 w-full flex justify-center">
-              <TextGenerateEffect
-                words="AI-Powered Medical Imaging on the Blockchain"
-                className="text-white/70 font-medium tracking-widest text-lg md:text-xl uppercase antialiased"
-              />
-            </div>
+<div className="mt-4 w-full flex justify-center">
+						<div className="font-[family-name:var(--font-inter)] font-semibold">
+							<TextGenerateEffect
+								words="AI-Powered Medical Imaging on the Blockchain"
+								className="text-white/70 tracking-widest text-lg md:text-xl uppercase antialiased"
+							/>
+						</div>
+					</div>
 
             {/* START DIAGNOSIS BUTTON - PRESERVED EXACTLY */}
             <motion.div
@@ -216,13 +218,13 @@ export default function AuthPage() {
         >
           <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-white/10 to-transparent" />
 
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95 }}
-            whileInView={{ opacity: 1, scale: 1 }}
-            viewport={{ once: true, margin: "-50px" }}
-            transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
-            className="relative w-full max-w-md"
-          >
+<motion.div
+					initial={{ opacity: 0, y: 40 }}
+					whileInView={{ opacity: 1, y: 0 }}
+					viewport={{ once: false, amount: 0.2, margin: "0px 0px -100px 0px" }}
+					transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
+					className="relative w-full max-w-md"
+				>
             <Icon className="absolute h-6 w-6 -top-3 -left-3 text-white/60 z-20" />
             <Icon className="absolute h-6 w-6 -bottom-3 -left-3 text-white/60 z-20" />
             <Icon className="absolute h-6 w-6 -top-3 -right-3 text-white/60 z-20" />
