@@ -12,7 +12,6 @@ interface DesktopHeaderProps {
   className?: string;
 }
 
-// Breadcrumb generator based on pathname
 function getBreadcrumbs(pathname: string): { label: string; href: string }[] {
   const segments = pathname.split("/").filter(Boolean);
   const breadcrumbs: { label: string; href: string }[] = [];
@@ -40,8 +39,8 @@ export function DesktopHeader({ title, className }: DesktopHeaderProps) {
       className={cn(
         "hidden lg:flex items-center justify-between",
         "sticky top-0 z-40 px-6 py-4",
-        "bg-background/80 backdrop-blur-xl",
-        "border-b border-border/50",
+        "bg-[#050506]/80 backdrop-blur-xl",
+        "border-b border-white/[0.06]",
         className
       )}
     >
@@ -50,14 +49,14 @@ export function DesktopHeader({ title, className }: DesktopHeaderProps) {
         {breadcrumbs.map((crumb, index) => (
           <div key={crumb.href} className="flex items-center gap-2">
             {index > 0 && (
-              <ChevronRight className="w-4 h-4 text-muted-foreground" />
+              <ChevronRight className="w-4 h-4 text-slate-500" />
             )}
             <span
               className={cn(
                 "text-sm",
                 index === breadcrumbs.length - 1
-                  ? "font-medium text-foreground"
-                  : "text-muted-foreground"
+                  ? "font-medium text-white"
+                  : "text-slate-400"
               )}
             >
               {crumb.label}
@@ -66,8 +65,8 @@ export function DesktopHeader({ title, className }: DesktopHeaderProps) {
         ))}
         {title && (
           <>
-            <ChevronRight className="w-4 h-4 text-muted-foreground" />
-            <span className="text-sm font-medium text-foreground">{title}</span>
+            <ChevronRight className="w-4 h-4 text-slate-500" />
+            <span className="text-sm font-medium text-white">{title}</span>
           </>
         )}
       </div>
@@ -78,12 +77,12 @@ export function DesktopHeader({ title, className }: DesktopHeaderProps) {
         <Input
           classNames={{
             base: "w-64",
-            innerWrapper: "bg-muted/50 hover:bg-muted/70 focus-within:bg-muted/50",
-            input: "text-sm",
-            inputWrapper: "border border-border/50 shadow-none",
+            innerWrapper: "bg-white/[0.05] hover:bg-white/[0.08] focus-within:bg-white/[0.05]",
+            input: "text-sm text-white placeholder:text-slate-500",
+            inputWrapper: "border border-white/[0.1] shadow-none",
           }}
           placeholder="Search..."
-          startContent={<Search className="w-4 h-4 text-muted-foreground" />}
+          startContent={<Search className="w-4 h-4 text-slate-500" />}
           radius="lg"
         />
 
@@ -92,7 +91,7 @@ export function DesktopHeader({ title, className }: DesktopHeaderProps) {
           isIconOnly
           variant="light"
           onPress={() => setTheme(theme === "dark" ? "light" : "dark")}
-          className="text-muted-foreground"
+          className="text-slate-400 hover:text-white"
         >
           {theme === "dark" ? (
             <Sun className="w-5 h-5" />
@@ -105,7 +104,7 @@ export function DesktopHeader({ title, className }: DesktopHeaderProps) {
         <Button
           isIconOnly
           variant="light"
-          className="text-muted-foreground mr-2"
+          className="text-slate-400 hover:text-white mr-2"
         >
           <Badge content="" color="primary" shape="circle" placement="top-right">
             <Bell className="w-5 h-5" />
@@ -113,18 +112,18 @@ export function DesktopHeader({ title, className }: DesktopHeaderProps) {
         </Button>
 
         {/* User Avatar */}
-        <div className="pl-3 border-l border-border/50">
+        <div className="pl-3 border-l border-white/[0.1]">
           <User
             name={user?.name || "User"}
             description={user?.address ? `${user.address.slice(0, 6)}...${user.address.slice(-4)}` : ""}
             classNames={{
-              name: "font-medium text-foreground",
-              description: "text-xs text-muted-foreground"
+              name: "font-medium text-white",
+              description: "text-xs text-slate-500"
             }}
             avatarProps={{
               name: user?.name?.slice(0, 2).toUpperCase() || "U",
               classNames: {
-                base: "bg-gradient-to-br from-accent to-primary text-white font-medium"
+                base: "bg-gradient-to-br from-cyan-500 to-blue-600 text-white font-medium"
               }
             }}
           />

@@ -88,7 +88,7 @@ export const DesktopSidebar = ({
     <>
       <motion.div
         className={cn(
-          "h-full px-4 py-4 hidden  md:flex md:flex-col bg-neutral-100 dark:bg-neutral-800 w-[300px] shrink-0",
+          "fixed inset-y-0 left-0 px-4 py-4 hidden lg:flex lg:flex-col bg-[#0a0a0c]/95 backdrop-blur-xl w-[300px] shrink-0 z-50 border-r border-white/[0.06]",
           className
         )}
         animate={{
@@ -167,7 +167,7 @@ export const SidebarLink = ({
     <a
       href={link.href}
       className={cn(
-        "flex items-center justify-start gap-2  group/sidebar py-2",
+        "flex items-center justify-start gap-2 group/sidebar py-2 px-2 rounded-lg hover:bg-white/[0.05] transition-all duration-200",
         className
       )}
       {...props}
@@ -179,7 +179,7 @@ export const SidebarLink = ({
           display: animate ? (open ? "inline-block" : "none") : "inline-block",
           opacity: animate ? (open ? 1 : 0) : 1,
         }}
-        className="text-neutral-700 dark:text-neutral-200 text-sm group-hover/sidebar:translate-x-1 transition duration-150 whitespace-pre inline-block !p-0 !m-0"
+        className="text-slate-400 text-sm group-hover/sidebar:text-white group-hover/sidebar:translate-x-1 transition-all duration-200 whitespace-pre inline-block !p-0 !m-0"
       >
         {link.label}
       </motion.span>

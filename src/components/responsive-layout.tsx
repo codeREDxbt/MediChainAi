@@ -30,10 +30,10 @@ export function ResponsiveLayout({
         </AppShell>
       </div>
 
-      <div className="hidden lg:flex min-h-screen bg-background text-foreground">
+      <div className="hidden lg:flex min-h-screen bg-transparent text-foreground">
         {layoutMode === "sidebar" ? (
           <DesktopSidebar>
-            <div className="flex-1 flex flex-col min-w-0 h-full w-full bg-background overflow-hidden relative">
+            <div className="flex-1 flex flex-col min-w-0 h-full w-full bg-transparent overflow-hidden relative lg:ml-[60px]">
               <DesktopHeader title={title} />
               <main className="flex-1 p-6 overflow-y-auto">
                 <div className="max-w-7xl mx-auto">
@@ -45,7 +45,7 @@ export function ResponsiveLayout({
         ) : (
           <div className="flex-1 flex flex-col min-w-0 w-full relative">
             <DesktopNavbar />
-            <main className="flex-1 p-8 mt-16 bg-background">
+            <main className="flex-1 p-8 mt-16 bg-transparent">
               <div className="container mx-auto">
                 {children}
               </div>

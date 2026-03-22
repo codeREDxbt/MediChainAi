@@ -5,15 +5,6 @@ import { SidebarProvider, Sidebar, SidebarBody, SidebarLink } from "@/components
 import { useAuth, UserRole } from "@/lib/auth-context";
 import { useRouter } from "next/navigation";
 import {
-  HomeTrackerIcon,
-  SettingsIcon,
-  WalletIcon,
-  ReportsIcon,
-  ScanIcon,
-  PatientIcon,
-  LogoutIcon
-} from "@/components/icons"; // Assuming we use lucid-react icons
-import {
   LayoutDashboard,
   FileStack,
   BarChart3,
@@ -29,29 +20,29 @@ import { MediChainLogo } from "@/components/top-bar";
 import { cn } from "@/lib/utils";
 
 const patientNavItems = [
-  { href: "/patient/dashboard", icon: <LayoutDashboard className="text-neutral-700 dark:text-neutral-200 h-5 w-5 flex-shrink-0" />, label: "Dashboard" },
-  { href: "/patient/my-scans", icon: <FileStack className="text-neutral-700 dark:text-neutral-200 h-5 w-5 flex-shrink-0" />, label: "My Scans" },
-  { href: "/patient/upload", icon: <Upload className="text-neutral-700 dark:text-neutral-200 h-5 w-5 flex-shrink-0" />, label: "Upload Scan" },
-  { href: "/patient/results", icon: <BarChart3 className="text-neutral-700 dark:text-neutral-200 h-5 w-5 flex-shrink-0" />, label: "AI Results" },
-  { href: "/patient/wallet", icon: <Wallet className="text-neutral-700 dark:text-neutral-200 h-5 w-5 flex-shrink-0" />, label: "Wallet" },
-  { href: "/patient/profile", icon: <User className="text-neutral-700 dark:text-neutral-200 h-5 w-5 flex-shrink-0" />, label: "Profile" },
-  { href: "/patient/settings", icon: <Settings className="text-neutral-700 dark:text-neutral-200 h-5 w-5 flex-shrink-0" />, label: "Settings" },
+  { href: "/patient/dashboard", icon: <LayoutDashboard className="text-slate-400 h-5 w-5 flex-shrink-0" />, label: "Dashboard" },
+  { href: "/patient/my-scans", icon: <FileStack className="text-slate-400 h-5 w-5 flex-shrink-0" />, label: "My Scans" },
+  { href: "/patient/upload", icon: <Upload className="text-slate-400 h-5 w-5 flex-shrink-0" />, label: "Upload Scan" },
+  { href: "/patient/results", icon: <BarChart3 className="text-slate-400 h-5 w-5 flex-shrink-0" />, label: "AI Results" },
+  { href: "/patient/wallet", icon: <Wallet className="text-slate-400 h-5 w-5 flex-shrink-0" />, label: "Wallet" },
+  { href: "/patient/profile", icon: <User className="text-slate-400 h-5 w-5 flex-shrink-0" />, label: "Profile" },
+  { href: "/patient/settings", icon: <Settings className="text-slate-400 h-5 w-5 flex-shrink-0" />, label: "Settings" },
 ];
 
 const adminNavItems = [
-  { href: "/admin/dashboard", icon: <LayoutDashboard className="text-neutral-700 dark:text-neutral-200 h-5 w-5 flex-shrink-0" />, label: "Dashboard" },
-  { href: "/admin/patients", icon: <Users className="text-neutral-700 dark:text-neutral-200 h-5 w-5 flex-shrink-0" />, label: "Patients" },
-  { href: "/admin/reports", icon: <FileText className="text-neutral-700 dark:text-neutral-200 h-5 w-5 flex-shrink-0" />, label: "Reports" },
-  { href: "/admin/settings", icon: <Settings className="text-neutral-700 dark:text-neutral-200 h-5 w-5 flex-shrink-0" />, label: "Settings" },
+  { href: "/admin/dashboard", icon: <LayoutDashboard className="text-slate-400 h-5 w-5 flex-shrink-0" />, label: "Dashboard" },
+  { href: "/admin/patients", icon: <Users className="text-slate-400 h-5 w-5 flex-shrink-0" />, label: "Patients" },
+  { href: "/admin/reports", icon: <FileText className="text-slate-400 h-5 w-5 flex-shrink-0" />, label: "Reports" },
+  { href: "/admin/settings", icon: <Settings className="text-slate-400 h-5 w-5 flex-shrink-0" />, label: "Settings" },
 ];
 
 const Logo = () => {
   return (
-    <div className="font-normal flex space-x-2 items-center text-sm text-black py-1 relative z-20">
-      <div className="h-5 w-6 bg-black dark:bg-white rounded-br-lg rounded-tr-sm rounded-tl-lg rounded-bl-sm flex-shrink-0 flex items-center justify-center">
-        <MediChainLogo className="w-4 h-4 text-white dark:text-black" />
+    <div className="font-normal flex space-x-2 items-center text-sm py-1 relative z-20">
+      <div className="h-5 w-6 bg-white rounded-br-lg rounded-tr-sm rounded-tl-lg rounded-bl-sm flex-shrink-0 flex items-center justify-center">
+        <MediChainLogo className="w-4 h-4 text-black" />
       </div>
-      <span className="font-medium text-black dark:text-white whitespace-pre">
+      <span className="font-medium text-white whitespace-pre">
         MediChainAI
       </span>
     </div>
@@ -60,9 +51,9 @@ const Logo = () => {
 
 const LogoIcon = () => {
   return (
-    <div className="font-normal flex space-x-2 items-center text-sm text-black py-1 relative z-20">
-      <div className="h-5 w-6 bg-black dark:bg-white rounded-br-lg rounded-tr-sm rounded-tl-lg rounded-bl-sm flex-shrink-0 flex items-center justify-center">
-        <MediChainLogo className="w-4 h-4 text-white dark:text-black" />
+    <div className="font-normal flex space-x-2 items-center text-sm py-1 relative z-20">
+      <div className="h-5 w-6 bg-white rounded-br-lg rounded-tr-sm rounded-tl-lg rounded-bl-sm flex-shrink-0 flex items-center justify-center">
+        <MediChainLogo className="w-4 h-4 text-black" />
       </div>
     </div>
   );
@@ -92,7 +83,7 @@ export function DesktopSidebar({ children }: { children: React.ReactNode }) {
                   label: "Logout",
                   href: "#",
                   icon: (
-                    <LogOut className="text-neutral-700 dark:text-neutral-200 h-5 w-5 flex-shrink-0" />
+                    <LogOut className="text-slate-400 h-5 w-5 flex-shrink-0" />
                   ),
                 }}
               />
@@ -103,7 +94,7 @@ export function DesktopSidebar({ children }: { children: React.ReactNode }) {
                 label: user?.name || "User",
                 href: "#",
                 icon: (
-                  <div className="h-7 w-7 flex-shrink-0 rounded-full bg-neutral-200 dark:bg-neutral-800 flex items-center justify-center text-xs font-bold text-neutral-600 dark:text-white">
+                  <div className="h-7 w-7 flex-shrink-0 rounded-full bg-slate-800 flex items-center justify-center text-xs font-bold text-white border border-white/10">
                     {user?.name?.slice(0, 2).toUpperCase() || "U"}
                   </div>
                 ),
