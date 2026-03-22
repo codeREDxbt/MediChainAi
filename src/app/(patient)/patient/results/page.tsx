@@ -166,77 +166,47 @@ function ResultsContent() {
 
     try {
       setIsAnalyzing(true);
-      const callRoute = async (url: string, init?: RequestInit) => {
-        const res = await fetch(url, init);
-        const rawBody = await res.text();
-        let data: any = null;
 
-        if (rawBody) {
-          try {
-            data = JSON.parse(rawBody);
-          } catch {
-            data = { error: rawBody };
-          }
+      const res = await fetch(`/api/scans/${scanId}/analyze`, {
+        method: "POST"
+      });
+
+      const rawBody = await res.text();
+      let data: any = null;
+
+      if (rawBody) {
+        try {
+          data = JSON.parse(rawBody);
+        } catch {
+          data = { error: rawBody };
         }
-
-        return { res, data };
-      };
-
-      const monaiCall = await callRoute("/api/ai/monai", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ scanId }),
-      });
-
-      const narrativeCall = await callRoute(`/api/scans/${scanId}/analyze`, {
-        method: "POST",
-      });
-
-      const monaiOk = monaiCall.res.ok;
-      const narrativeOk = narrativeCall.res.ok;
-
-      if (!monaiOk && !narrativeOk) {
-        const errors = [monaiCall.data, narrativeCall.data]
-          .map((payload, index) => {
-            const label = index === 0 ? "MONAI" : "Narrative";
-            const message = payload?.details
-              ? `${payload.error || label}: ${payload.details}`
-              : payload?.error;
-            return message ? `${label}: ${message}` : null;
-          })
-          .filter(Boolean)
-          .join(" | ");
-
-        throw new Error(errors || "Analysis failed");
       }
 
-      const refreshedScanRes = await fetch(`/api/scans/${scanId}`);
-      if (!refreshedScanRes.ok) {
-        throw new Error("Analysis finished, but refreshing the scan view failed");
+      if (!res.ok) {
+        const detailMessage = data?.details
+          ? `${data.error || 'Analysis failed'}: ${data.details}`
+          : (data?.error || `Analysis failed (HTTP ${res.status})`);
+        throw new Error(detailMessage);
       }
 
-      const refreshedScanPayload = await refreshedScanRes.json();
-      setScan(refreshedScanPayload.scan);
-
+      // Refresh token balance
       await refreshBalance();
 
-      if (monaiOk && narrativeOk) {
-        success(
-          narrativeCall.data?.tokenMinted
-            ? "MONAI + narrative analysis complete. MCI tokens rewarded."
-            : "MONAI + narrative analysis complete."
-        );
-      } else if (narrativeOk) {
-        success(
-          narrativeCall.data?.tokenMinted
-            ? "Narrative analysis complete. MCI tokens rewarded."
-            : "Narrative analysis complete."
-        );
-      } else {
-        success("MONAI analysis complete. Narrative report is still unavailable.");
-      }
+      // Update scan state with new analysis
+      const findingsObj = typeof data.analysis?.findings === 'string'
+        ? JSON.parse(data.analysis.findings)
+        : data.analysis?.findings;
+
+      setScan((prev) => prev ? ({
+        ...prev,
+        status: "Analyzed",
+        confidence: data.analysis?.confidence_score || 0,
+        findings: JSON.stringify(findingsObj),
+        riskScore: data.analysis?.confidence_score || 0,
+        riskLevel: (data.analysis?.confidence_score || 0) > 85 ? "High" : "Low"
+      }) : null);
+
+      success('Analysis complete! MCI tokens rewarded.');
     } catch (err) {
       console.error("Analysis error:", err);
       const errMsg = err instanceof Error ? err.message : 'Analysis failed';

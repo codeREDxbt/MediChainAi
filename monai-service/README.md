@@ -22,9 +22,6 @@ Medical-image AI microservice for **MediChainAi**, powered by [MONAI](https://mo
 
 ## Setup (Local Dev)
 
-The service reads shared configuration from the repo root `.env.local`, so the
-same `MONAI_SHARED_SECRET` can be used by both Next.js and FastAPI during local development.
-
 ```bash
 # 1. Create Python virtual environment
 cd monai-service
@@ -48,7 +45,7 @@ Bundles are cached in `.model_cache/` so subsequent starts are instant.
 ## Setup (Docker)
 
 ```bash
-# From the project root (.env.local must exist)
+# From the project root
 docker compose up monai-service
 ```
 

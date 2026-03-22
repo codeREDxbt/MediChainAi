@@ -37,24 +37,6 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 // Optional: Provide a default mint address if env is missing, for dev purposes
 const MCI_TOKEN_MINT = process.env.NEXT_PUBLIC_MCI_TOKEN_MINT || "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"; // Defaulting to USDC mainnet format, but will be overriden by devnet
 
-async function readJsonResponse<T>(response: Response, fallbackMessage: string): Promise<T> {
-  const rawText = await response.text();
-
-  if (!rawText) {
-    return {} as T;
-  }
-
-  try {
-    return JSON.parse(rawText) as T;
-  } catch {
-    if (rawText.startsWith("<!DOCTYPE") || rawText.startsWith("<html")) {
-      throw new Error(fallbackMessage);
-    }
-
-    throw new Error(rawText);
-  }
-}
-
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -96,10 +78,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const fetchUser = useCallback(async () => {
     try {
       const response = await fetch('/api/auth/me');
-      const data = await readJsonResponse<{ user?: AuthUser | null }>(
-        response,
-        'Auth status endpoint returned HTML instead of JSON'
-      );
+      const data = await response.json();
 
       if (data.user) {
         setUser(data.user);
@@ -141,10 +120,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // 1. Get nonce from server
       const nonceResponse = await fetch('/api/auth/nonce', { method: 'POST' });
       if (!nonceResponse.ok) throw new Error('Failed to get nonce');
-      const { nonce } = await readJsonResponse<{ nonce?: string }>(
-        nonceResponse,
-        'Nonce endpoint returned HTML instead of JSON'
-      );
+      const { nonce } = await nonceResponse.json();
 
       if (!nonce) {
         throw new Error('Failed to get nonce');
@@ -169,10 +145,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }),
       });
 
-      const verifyData = await readJsonResponse<{ user?: AuthUser; error?: string }>(
-        verifyResponse,
-        'Login endpoint returned HTML instead of JSON'
-      );
+      const verifyData = await verifyResponse.json();
 
       if (!verifyResponse.ok) {
         throw new Error(verifyData.error || 'Verification failed');
@@ -210,10 +183,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ role })
       });
-      const data = await readJsonResponse<{ user?: AuthUser; error?: string }>(
-        res,
-        'Demo login endpoint returned HTML instead of JSON'
-      );
+      const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Demo login failed');
       setUser(data.user);
     } catch (e) {

@@ -2,7 +2,7 @@
 import { NextResponse } from "next/server";
 import { jwtVerify } from "jose";
 import { cookies } from "next/headers";
-import { isSupabaseConfigured, supabaseServer } from "@/lib/supabase";
+import { supabaseServer } from "@/lib/supabase";
 import { getJwtSecret } from "@/lib/jwt";
 
 export const dynamic = 'force-dynamic';
@@ -19,21 +19,9 @@ export async function GET() {
 
     // Verify JWT
     const { payload } = await jwtVerify(token, secret);
-    const payloadUser = {
-      id: String(payload.sub || ""),
-      name: typeof payload.name === "string" && payload.name.trim() ? payload.name : "Anonymous",
-      address: typeof payload.walletAddress === "string" ? payload.walletAddress : "",
-      role: payload.role === "admin" ? "admin" : "patient",
-    };
+    // payload has sub (id), walletAddress, role
 
-    if (!payloadUser.id || !payloadUser.address) {
-      return NextResponse.json({ user: null });
-    }
-
-    if (!isSupabaseConfigured) {
-      return NextResponse.json({ user: payloadUser });
-    }
-
+    // Optionally fetch fresh data from DB to ensure user still exists/role hasn't changed
     const { data: user, error } = await supabaseServer
       .from('users')
       .select('*')
@@ -41,12 +29,13 @@ export async function GET() {
       .single();
 
     if (error || !user) {
-      return NextResponse.json({ user: payloadUser });
+      return NextResponse.json({ user: null });
     }
 
+    // Map to AuthUser interface
     const authUser = {
       id: user.id,
-      name: user.username || payloadUser.name,
+      name: user.username || "Anonymous",
       address: user.wallet_address,
       role: user.role
     };

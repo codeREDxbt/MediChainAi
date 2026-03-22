@@ -7,8 +7,6 @@ services:
       context: ./monai-service
       dockerfile: Dockerfile
     container_name: medichain-monai
-    env_file:
-      - ./.env.local
     ports:
       - "8000:8000"
     volumes:
@@ -36,8 +34,6 @@ services:
   #     context: .
   #     dockerfile: Dockerfile.nextjs
   #   container_name: medichain-nextjs
-  #   env_file:
-  #     - ./.env.local
   #   ports:
   #     - "3000:3000"
   #   environment:

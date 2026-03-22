@@ -1,5 +1,3 @@
-import { buildPresentationAnalysis } from "@/lib/analysis-results";
-
 export interface ScanRecord {
   id: string;
   upload_date: string;
@@ -9,13 +7,9 @@ export interface AnalysisRecord {
   analysis_results:
     | {
         confidence_score?: number | null;
-        model_source?: string | null;
-        processed_at?: string | null;
       }
     | Array<{
         confidence_score?: number | null;
-        model_source?: string | null;
-        processed_at?: string | null;
       }>
     | null;
 }
@@ -29,7 +23,9 @@ export interface DashboardStat {
 }
 
 function getConfidenceScore(record: AnalysisRecord): number | null {
-  const analysis = buildPresentationAnalysis(record.analysis_results);
+  const analysis = Array.isArray(record.analysis_results)
+    ? record.analysis_results[0]
+    : record.analysis_results;
 
   const score = analysis?.confidence_score;
 

@@ -17,7 +17,6 @@ export interface AnalysisResult {
   scanId: string;
   confidenceScore: number | null;
   findings: AnalysisFindings | null;
-  modelSource?: string | null;
   processedAt: Date;
 }
 
@@ -47,8 +46,6 @@ export interface FormattedScan {
   status: ScanStatus;
   modality?: string;
   region?: string;
-  analysisSource?: string | null;
-  analysisSources?: string[];
 }
 
 export interface ApiResponse<T> {
