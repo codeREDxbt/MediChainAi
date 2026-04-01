@@ -2,14 +2,12 @@
 
 import { useState, useEffect } from "react";
 import { TopBar } from "@/components/top-bar";
-import { Card, CardBody, CardHeader, Button, Chip, Avatar, Input } from "@heroui/react";
 import { 
-  User, Wallet, Shield, Bell, Settings, HelpCircle, LogOut, 
-  Copy, Check, Camera, Mail, Phone, Calendar, AlertCircle,
-  FileText, Brain, Coins, Activity, Edit2, Save, X
+  User, Wallet, Copy, Check, Camera, Mail, Phone, Calendar, AlertCircle,
+  FileText, Brain, Coins, Activity, Edit2, Save, X, LogOut, Settings, HelpCircle
 } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
-import { motion } from "motion/react";
+import { motion } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
 import { GlowingEffect } from "@/components/ui/glowing-effect";
 import { NumberTicker } from "@/components/ui/number-ticker";
@@ -17,7 +15,7 @@ import Link from "next/link";
 
 const containerVariants = { 
   hidden: { opacity: 0 }, 
-  visible: { opacity: 1, transition: { staggerChildren: 0.1 } } 
+  visible: { opacity: 1, transition: { staggerChildren: 0.08 } } 
 };
 
 const itemVariants = {
@@ -25,7 +23,7 @@ const itemVariants = {
   visible: { 
     opacity: 1, 
     y: 0, 
-    transition: { duration: 0.45, ease: [0.23, 1, 0.32, 1] as any }
+    transition: { duration: 0.4, ease: [0.23, 1, 0.32, 1] as any }
   }
 };
 
@@ -121,7 +119,7 @@ export default function PatientProfilePage() {
     }
   };
 
-  const getInitials = (name: string | null) => {
+  const getInitials = (name: string | null | undefined) => {
     if (!name) return "U";
     return name.split(" ").map(n => n[0]).join("").toUpperCase().slice(0, 2);
   };
@@ -141,19 +139,19 @@ export default function PatientProfilePage() {
 
   if (isLoading) {
     return (
-      <div className="flex flex-col min-h-screen">
+      <div className="flex flex-col min-h-screen bg-[#050506]">
         <div className="lg:hidden">
           <TopBar title="Profile" showLogo={false} showNotifications={false} showAvatar={false} />
         </div>
         <div className="flex-1 flex items-center justify-center">
-          <div className="animate-spin w-8 h-8 border-2 border-primary border-t-transparent rounded-full" />
+          <div className="animate-spin w-8 h-8 border-2 border-[#5E6AD2] border-t-transparent rounded-full" />
         </div>
       </div>
     );
   }
 
   return (
-    <div className="flex flex-col min-h-screen">
+    <div className="min-h-screen bg-[#050506] font-sans text-[#EDEDEF] selection:bg-[#5E6AD2]/30">
       <div className="lg:hidden">
         <TopBar 
           title="Profile" 
@@ -161,14 +159,9 @@ export default function PatientProfilePage() {
           showNotifications={false} 
           showAvatar={false}
           rightContent={
-            <Button 
-              isIconOnly 
-              variant="light" 
-              size="sm"
-              onPress={() => setIsEditing(!isEditing)}
-            >
+            <button onClick={() => setIsEditing(!isEditing)} className="p-2 rounded-lg hover:bg-white/[0.04] transition-colors">
               {isEditing ? <X className="w-4 h-4" /> : <Edit2 className="w-4 h-4" />}
-            </Button>
+            </button>
           }
         />
       </div>
@@ -177,338 +170,265 @@ export default function PatientProfilePage() {
         variants={containerVariants} 
         initial="hidden" 
         animate="visible" 
-        className="flex-1 px-4 py-6 space-y-6 lg:px-0 lg:py-0"
+        className="max-w-5xl mx-auto px-4 py-8 lg:py-12 space-y-6"
       >
-        {/* Desktop Header */}
-        <motion.div variants={itemVariants} className="hidden lg:flex lg:items-center lg:justify-between lg:mb-6">
+        <motion.div variants={itemVariants} className="hidden lg:flex lg:items-center lg:justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-foreground">Profile</h1>
-            <p className="text-muted-foreground">Manage your account and view your stats</p>
+            <h1 className="text-2xl font-bold text-[#EDEDEF] tracking-tight">Profile</h1>
+            <p className="text-sm text-[#8A8F98]">Manage your account and view your stats</p>
           </div>
           {!isEditing && (
-            <Button
-              variant="flat"
-              color="primary"
-              startContent={<Edit2 className="w-4 h-4" />}
-              onPress={() => setIsEditing(true)}
+            <button
+              onClick={() => setIsEditing(true)}
+              className="flex items-center gap-2 px-4 py-2 rounded-xl bg-white/[0.02] border border-white/[0.06] text-[#EDEDEF] text-sm font-medium hover:bg-white/[0.04] transition-all"
             >
+              <Edit2 className="w-4 h-4" />
               Edit Profile
-            </Button>
+            </button>
           )}
         </motion.div>
 
         <div className="lg:grid lg:grid-cols-3 lg:gap-6">
-          {/* Left Column - Profile Info */}
           <div className="lg:col-span-2 space-y-6">
-            {/* Profile Header Card */}
             <motion.div variants={itemVariants}>
-              <Card className="overflow-hidden bg-slate-900/40 backdrop-blur-xl border-white/5 shadow-2xl">
-                <div className="relative h-32 bg-gradient-to-r from-primary/20 via-primary/10 to-emerald-500/20">
-                  <div className="absolute inset-0 bg-[url('/grid-pattern.svg')] opacity-20" />
-                </div>
-                <CardBody className="relative pb-6">
-                  <div className="flex flex-col sm:flex-row items-center sm:items-end gap-4 -mt-16">
+              <div className="relative bg-[#12121a] border border-white/[0.06] rounded-2xl overflow-hidden">
+                <div className="relative h-24 bg-gradient-to-r from-[#5E6AD2]/20 via-[#5E6AD2]/10 to-emerald-500/20" />
+                <div className="p-5">
+                  <div className="flex flex-col sm:flex-row items-center sm:items-end gap-4 -mt-12">
                     <div className="relative">
-                      <Avatar
-                        src={profile?.avatarUrl || undefined}
-                        name={getInitials(profile?.username)}
-                        className="w-24 h-24 text-2xl border-4 border-background"
-                        color="primary"
-                      />
+                      <div className="w-24 h-24 rounded-full bg-[#050506] border-4 border-[#050506] flex items-center justify-center text-xl font-bold text-[#5E6AD2]">
+                        {getInitials(profile?.username)}
+                      </div>
                       {isEditing && (
-                        <Button
-                          isIconOnly
-                          size="sm"
-                          className="absolute bottom-0 right-0 rounded-full"
-                          onPress={() => {}}
-                        >
-                          <Camera className="w-3 h-3" />
-                        </Button>
+                        <button className="absolute bottom-0 right-0 w-8 h-8 rounded-full bg-[#5E6AD2] flex items-center justify-center">
+                          <Camera className="w-3.5 h-3.5 text-white" />
+                        </button>
                       )}
                     </div>
                     <div className="flex-1 text-center sm:text-left">
                       <div className="flex items-center justify-center sm:justify-start gap-2">
-                        <h2 className="text-2xl font-bold text-foreground">
+                        <h2 className="text-xl font-bold text-[#EDEDEF]">
                           {profile?.username || "Anonymous User"}
                         </h2>
-                        <Chip 
-                          variant="flat" 
-                          color={profile?.role === "admin" ? "warning" : "primary"}
-                          size="sm"
-                        >
+                        <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${profile?.role === "admin" ? "bg-amber-500/10 text-amber-400" : "bg-[#5E6AD2]/10 text-[#5E6AD2]"}`}>
                           {profile?.role === "admin" ? "Admin" : "Patient"}
-                        </Chip>
+                        </span>
                       </div>
-                      <p className="text-muted-foreground text-sm">
+                      <p className="text-sm text-[#8A8F98]">
                         Member since {formatDate(profile?.createdAt || null)}
                       </p>
                     </div>
                   </div>
-                </CardBody>
-              </Card>
+                </div>
+              </div>
             </motion.div>
 
-            {/* Wallet Connection Card */}
             <motion.div variants={itemVariants}>
-              <Card className="overflow-hidden bg-slate-900/40 backdrop-blur-xl border-white/5 shadow-2xl">
-                <CardHeader className="pb-2">
-                  <div className="flex items-center gap-2">
-                    <Wallet className="w-5 h-5 text-primary" />
-                    <h3 className="text-sm font-semibold uppercase text-muted-foreground tracking-wider">Wallet Connection</h3>
+              <div className="bg-[#12121a] border border-white/[0.06] rounded-2xl p-5 space-y-4">
+                <div className="flex items-center gap-2">
+                  <Wallet className="w-5 h-5 text-[#5E6AD2]" />
+                  <h3 className="text-sm font-semibold text-[#EDEDEF]">Wallet Connection</h3>
+                </div>
+
+                <div className="flex items-center justify-between p-4 rounded-xl bg-[#050506] border border-white/[0.06]">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-lg bg-[#5E6AD2]/20 flex items-center justify-center">
+                      <Wallet className="w-5 h-5 text-[#5E6AD2]" />
+                    </div>
+                    <div>
+                      <p className="text-sm text-[#8A8F98]">Solana Wallet</p>
+                      <p className="font-mono text-sm text-[#EDEDEF]">
+                        {profile?.walletAddress ? formatWalletAddress(profile.walletAddress) : "Not connected"}
+                      </p>
+                    </div>
                   </div>
-                </CardHeader>
-                <CardBody className="space-y-4">
-                  <div className="flex items-center justify-between p-4 rounded-2xl bg-background/50 border border-white/5">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-medium px-2 py-1 rounded-full bg-emerald-500/10 text-emerald-400 flex items-center gap-1.5">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                      Devnet
+                    </span>
+                    <button onClick={copyAddress} className="p-1.5 rounded-lg hover:bg-white/[0.04] transition-colors">
+                      {copied ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4 text-[#8A8F98]" />}
+                    </button>
+                  </div>
+                </div>
+
+                {tokenBalance && (
+                  <div className="flex items-center justify-between p-4 rounded-xl bg-emerald-500/5 border border-emerald-500/10">
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
-                        <Wallet className="w-5 h-5 text-primary" />
+                      <div className="w-10 h-10 rounded-lg bg-emerald-500/10 flex items-center justify-center">
+                        <Coins className="w-5 h-5 text-emerald-500" />
                       </div>
                       <div>
-                        <p className="text-sm text-muted-foreground">Solana Wallet</p>
-                        <p className="font-mono text-sm text-foreground">
-                          {profile?.walletAddress ? formatWalletAddress(profile.walletAddress) : "Not connected"}
+                        <p className="text-sm text-[#8A8F98]">MCI Token Balance</p>
+                        <p className="text-xl font-bold text-[#EDEDEF]">
+                          <NumberTicker value={tokenBalance.uiAmount} /> <span className="text-sm font-normal text-[#8A8F98]">MCI</span>
                         </p>
                       </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <Chip variant="flat" color="success" size="sm">
-                        <span className="w-1.5 h-1.5 rounded-full bg-success mr-1.5 animate-pulse" />
-                        Devnet
-                      </Chip>
-                      <Button
-                        isIconOnly
-                        variant="light"
-                        size="sm"
-                        onPress={copyAddress}
-                      >
-                        {copied ? <Check className="w-4 h-4 text-success" /> : <Copy className="w-4 h-4" />}
-                      </Button>
-                    </div>
+                    <Link href="/patient/wallet" className="px-3 py-1.5 rounded-lg bg-emerald-500/10 text-emerald-400 text-sm font-medium hover:bg-emerald-500/20 transition-colors">
+                      View Wallet
+                    </Link>
                   </div>
-
-                  {tokenBalance && (
-                    <div className="flex items-center justify-between p-4 rounded-2xl bg-emerald-500/5 border border-emerald-500/10">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-xl bg-emerald-500/10 flex items-center justify-center">
-                          <Coins className="w-5 h-5 text-emerald-500" />
-                        </div>
-                        <div>
-                          <p className="text-sm text-muted-foreground">MCI Token Balance</p>
-                          <p className="text-xl font-bold text-foreground">
-                            <NumberTicker value={tokenBalance.uiAmount} /> <span className="text-sm font-normal text-muted-foreground">MCI</span>
-                          </p>
-                        </div>
-                      </div>
-                      <Link href="/patient/wallet">
-                        <Button variant="flat" size="sm" color="success">
-                          View Wallet
-                        </Button>
-                      </Link>
-                    </div>
-                  )}
-                </CardBody>
-              </Card>
+                )}
+              </div>
             </motion.div>
 
-            {/* Personal Information Card */}
             <motion.div variants={itemVariants}>
-              <Card className="overflow-hidden bg-slate-900/40 backdrop-blur-xl border-white/5 shadow-2xl">
-                <CardHeader className="pb-2">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <User className="w-5 h-5 text-primary" />
-                      <h3 className="text-sm font-semibold uppercase text-muted-foreground tracking-wider">Personal Information</h3>
-                    </div>
-                    {isEditing ? (
-                      <div className="flex gap-2">
-                        <Button size="sm" variant="flat" onPress={() => setIsEditing(false)}>
-                          Cancel
-                        </Button>
-                        <Button size="sm" color="primary" startContent={<Save className="w-3 h-3" />} onPress={handleSaveProfile}>
-                          Save
-                        </Button>
-                      </div>
-                    ) : (
-                      <Button size="sm" variant="light" startContent={<Edit2 className="w-3 h-3" />} onPress={() => setIsEditing(true)}>
-                        Edit
-                      </Button>
-                    )}
+              <div className="bg-[#12121a] border border-white/[0.06] rounded-2xl p-5 space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <User className="w-5 h-5 text-[#5E6AD2]" />
+                    <h3 className="text-sm font-semibold text-[#EDEDEF]">Personal Information</h3>
                   </div>
-                </CardHeader>
-                <CardBody className="space-y-4">
                   {isEditing ? (
-                    <>
-                      <Input
-                        label="Username"
+                    <div className="flex gap-2">
+                      <button onClick={() => setIsEditing(false)} className="px-3 py-1.5 rounded-lg bg-white/[0.02] text-[#8A8F98] text-sm hover:bg-white/[0.04] transition-colors">
+                        Cancel
+                      </button>
+                      <button onClick={handleSaveProfile} className="px-3 py-1.5 rounded-lg bg-[#5E6AD2] text-white text-sm font-medium hover:bg-[#6872D9] transition-colors flex items-center gap-1.5">
+                        <Save className="w-3.5 h-3.5" />
+                        Save
+                      </button>
+                    </div>
+                  ) : (
+                    <button onClick={() => setIsEditing(true)} className="px-3 py-1.5 rounded-lg text-[#8A8F98] text-sm hover:text-[#EDEDEF] hover:bg-white/[0.02] transition-colors flex items-center gap-1.5">
+                      <Edit2 className="w-3.5 h-3.5" />
+                      Edit
+                    </button>
+                  )}
+                </div>
+
+                {isEditing ? (
+                  <div className="space-y-3">
+                    <div>
+                      <label className="text-xs text-[#8A8F98] mb-1 block">Username</label>
+                      <input
+                        type="text"
                         placeholder="Enter your username"
                         value={editForm.username}
                         onChange={(e) => setEditForm({ ...editForm, username: e.target.value })}
-                        startContent={<User className="w-4 h-4 text-muted-foreground" />}
+                        className="w-full bg-[#050506] border border-white/[0.1] rounded-lg py-2 px-3 text-sm text-[#EDEDEF] placeholder:text-[#8A8F98] focus:outline-none focus:ring-1 focus:ring-[#5E6AD2] focus:border-[#5E6AD2]"
                       />
-                      <Input
-                        label="Email"
-                        placeholder="Enter your email"
+                    </div>
+                    <div>
+                      <label className="text-xs text-[#8A8F98] mb-1 block">Email</label>
+                      <input
                         type="email"
+                        placeholder="Enter your email"
                         value={editForm.email}
                         onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
-                        startContent={<Mail className="w-4 h-4 text-muted-foreground" />}
+                        className="w-full bg-[#050506] border border-white/[0.1] rounded-lg py-2 px-3 text-sm text-[#EDEDEF] placeholder:text-[#8A8F98] focus:outline-none focus:ring-1 focus:ring-[#5E6AD2] focus:border-[#5E6AD2]"
                       />
-                      <Input
-                        label="Phone"
+                    </div>
+                    <div>
+                      <label className="text-xs text-[#8A8F98] mb-1 block">Phone</label>
+                      <input
+                        type="text"
                         placeholder="Enter your phone number"
                         value={editForm.phone}
                         onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })}
-                        startContent={<Phone className="w-4 h-4 text-muted-foreground" />}
+                        className="w-full bg-[#050506] border border-white/[0.1] rounded-lg py-2 px-3 text-sm text-[#EDEDEF] placeholder:text-[#8A8F98] focus:outline-none focus:ring-1 focus:ring-[#5E6AD2] focus:border-[#5E6AD2]"
                       />
-                      <Input
-                        label="Emergency Contact"
+                    </div>
+                    <div>
+                      <label className="text-xs text-[#8A8F98] mb-1 block">Emergency Contact</label>
+                      <input
+                        type="text"
                         placeholder="Enter emergency contact"
                         value={editForm.emergencyContact}
                         onChange={(e) => setEditForm({ ...editForm, emergencyContact: e.target.value })}
-                        startContent={<AlertCircle className="w-4 h-4 text-muted-foreground" />}
+                        className="w-full bg-[#050506] border border-white/[0.1] rounded-lg py-2 px-3 text-sm text-[#EDEDEF] placeholder:text-[#8A8F98] focus:outline-none focus:ring-1 focus:ring-[#5E6AD2] focus:border-[#5E6AD2]"
                       />
-                    </>
-                  ) : (
-                    <>
-                      <div className="flex items-center justify-between py-3 border-b border-white/5">
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-1">
+                    {[
+                      { icon: User, label: "Username", value: profile?.username || "Not set" },
+                      { icon: Mail, label: "Email", value: profile?.email || "Not set" },
+                      { icon: Phone, label: "Phone", value: profile?.phone || "Not set" },
+                      { icon: Calendar, label: "Member Since", value: formatDate(profile?.createdAt || null) },
+                      { icon: AlertCircle, label: "Emergency Contact", value: profile?.emergencyContact || "Not set" },
+                    ].map((item) => (
+                      <div key={item.label} className="flex items-center justify-between py-2.5 border-b border-white/[0.04] last:border-0">
                         <div className="flex items-center gap-3">
-                          <User className="w-4 h-4 text-muted-foreground" />
-                          <span className="text-sm text-muted-foreground">Username</span>
+                          <item.icon className="w-4 h-4 text-[#8A8F98]" />
+                          <span className="text-sm text-[#8A8F98]">{item.label}</span>
                         </div>
-                        <span className="text-sm font-medium text-foreground">{profile?.username || "Not set"}</span>
+                        <span className="text-sm font-medium text-[#EDEDEF]">{item.value}</span>
                       </div>
-                      <div className="flex items-center justify-between py-3 border-b border-white/5">
-                        <div className="flex items-center gap-3">
-                          <Mail className="w-4 h-4 text-muted-foreground" />
-                          <span className="text-sm text-muted-foreground">Email</span>
-                        </div>
-                        <span className="text-sm font-medium text-foreground">{profile?.email || "Not set"}</span>
-                      </div>
-                      <div className="flex items-center justify-between py-3 border-b border-white/5">
-                        <div className="flex items-center gap-3">
-                          <Phone className="w-4 h-4 text-muted-foreground" />
-                          <span className="text-sm text-muted-foreground">Phone</span>
-                        </div>
-                        <span className="text-sm font-medium text-foreground">{profile?.phone || "Not set"}</span>
-                      </div>
-                      <div className="flex items-center justify-between py-3 border-b border-white/5">
-                        <div className="flex items-center gap-3">
-                          <Calendar className="w-4 h-4 text-muted-foreground" />
-                          <span className="text-sm text-muted-foreground">Member Since</span>
-                        </div>
-                        <span className="text-sm font-medium text-foreground">{formatDate(profile?.createdAt || null)}</span>
-                      </div>
-                      <div className="flex items-center justify-between py-3">
-                        <div className="flex items-center gap-3">
-                          <AlertCircle className="w-4 h-4 text-muted-foreground" />
-                          <span className="text-sm text-muted-foreground">Emergency Contact</span>
-                        </div>
-                        <span className="text-sm font-medium text-foreground">{profile?.emergencyContact || "Not set"}</span>
-                      </div>
-                    </>
-                  )}
-                </CardBody>
-              </Card>
+                    ))}
+                  </div>
+                )}
+              </div>
             </motion.div>
           </div>
 
-          {/* Right Column - Stats & Actions */}
           <div className="space-y-6 mt-6 lg:mt-0">
-            {/* Stats Card */}
             <motion.div variants={itemVariants}>
-              <Card className="overflow-hidden bg-slate-900/40 backdrop-blur-xl border-white/5 shadow-2xl">
-                <CardHeader className="pb-2">
-                  <div className="flex items-center gap-2">
-                    <Activity className="w-5 h-5 text-primary" />
-                    <h3 className="text-sm font-semibold uppercase text-muted-foreground tracking-wider">Your Stats</h3>
-                  </div>
-                </CardHeader>
-                <CardBody className="space-y-4">
-                  <div className="relative rounded-2xl bg-background/50 p-4 border border-white/5">
-                    <GlowingEffect spread={20} glow={true} className="z-0" />
-                    <div className="relative z-10">
-                      <div className="flex items-center gap-3 mb-2">
-                        <div className="w-8 h-8 rounded-lg bg-blue-500/10 flex items-center justify-center">
-                          <FileText className="w-4 h-4 text-blue-500" />
-                        </div>
-                        <span className="text-sm text-muted-foreground">Total Scans</span>
-                      </div>
-                      <p className="text-3xl font-bold text-foreground">
-                        <NumberTicker value={stats?.totalScans || 0} />
-                      </p>
-                    </div>
-                  </div>
+              <div className="bg-[#12121a] border border-white/[0.06] rounded-2xl p-5 space-y-4">
+                <div className="flex items-center gap-2">
+                  <Activity className="w-5 h-5 text-[#5E6AD2]" />
+                  <h3 className="text-sm font-semibold text-[#EDEDEF]">Your Stats</h3>
+                </div>
 
-                  <div className="relative rounded-2xl bg-background/50 p-4 border border-white/5">
+                {[
+                  { icon: FileText, label: "Total Scans", value: stats?.totalScans || 0, color: "text-blue-500", bg: "bg-blue-500/10" },
+                  { icon: Brain, label: "Analyzed", value: stats?.analyzedScans || 0, color: "text-emerald-500", bg: "bg-emerald-500/10" },
+                  { icon: Coins, label: "MCI Earned", value: tokenBalance?.uiAmount || 0, color: "text-amber-500", bg: "bg-amber-500/10" },
+                ].map((stat) => (
+                  <div key={stat.label} className="relative rounded-xl bg-[#050506] p-4 border border-white/[0.06]">
                     <GlowingEffect spread={20} glow={true} className="z-0" />
                     <div className="relative z-10">
                       <div className="flex items-center gap-3 mb-2">
-                        <div className="w-8 h-8 rounded-lg bg-emerald-500/10 flex items-center justify-center">
-                          <Brain className="w-4 h-4 text-emerald-500" />
+                        <div className={`w-8 h-8 rounded-lg ${stat.bg} flex items-center justify-center`}>
+                          <stat.icon className={`w-4 h-4 ${stat.color}`} />
                         </div>
-                        <span className="text-sm text-muted-foreground">Analyzed</span>
+                        <span className="text-sm text-[#8A8F98]">{stat.label}</span>
                       </div>
-                      <p className="text-3xl font-bold text-foreground">
-                        <NumberTicker value={stats?.analyzedScans || 0} />
+                      <p className="text-2xl font-bold text-[#EDEDEF]">
+                        <NumberTicker value={stat.value} />
                       </p>
                     </div>
                   </div>
-
-                  <div className="relative rounded-2xl bg-background/50 p-4 border border-white/5">
-                    <GlowingEffect spread={20} glow={true} className="z-0" />
-                    <div className="relative z-10">
-                      <div className="flex items-center gap-3 mb-2">
-                        <div className="w-8 h-8 rounded-lg bg-amber-500/10 flex items-center justify-center">
-                          <Coins className="w-4 h-4 text-amber-500" />
-                        </div>
-                        <span className="text-sm text-muted-foreground">MCI Earned</span>
-                      </div>
-                      <p className="text-3xl font-bold text-foreground">
-                        <NumberTicker value={tokenBalance?.uiAmount || 0} />
-                      </p>
-                    </div>
-                  </div>
-                </CardBody>
-              </Card>
+                ))}
+              </div>
             </motion.div>
 
-            {/* Quick Actions */}
             <motion.div variants={itemVariants}>
-              <Card className="overflow-hidden bg-slate-900/40 backdrop-blur-xl border-white/5 shadow-2xl">
-                <CardHeader className="pb-2">
-                  <h3 className="text-sm font-semibold uppercase text-muted-foreground tracking-wider">Quick Actions</h3>
-                </CardHeader>
-                <CardBody className="space-y-2">
-                  <Link href="/patient/settings" className="block">
-                    <Button variant="flat" className="w-full justify-start h-12" startContent={<Settings className="w-4 h-4" />}>
-                      Settings
-                    </Button>
-                  </Link>
-                  <Link href="/patient/wallet" className="block">
-                    <Button variant="flat" className="w-full justify-start h-12" startContent={<Wallet className="w-4 h-4" />}>
-                      Manage Wallet
-                    </Button>
-                  </Link>
-                  <Button variant="flat" className="w-full justify-start h-12" startContent={<HelpCircle className="w-4 h-4" />}>
-                    Help Center
-                  </Button>
-                  <Button 
-                    variant="flat" 
-                    color="danger"
-                    className="w-full justify-start h-12" 
-                    startContent={<LogOut className="w-4 h-4" />}
-                    onPress={logout}
-                  >
-                    Sign Out
-                  </Button>
-                </CardBody>
-              </Card>
+              <div className="bg-[#12121a] border border-white/[0.06] rounded-2xl p-5 space-y-2">
+                <h3 className="text-sm font-semibold text-[#EDEDEF] mb-3">Quick Actions</h3>
+                {[
+                  { icon: Settings, label: "Settings", href: "/patient/settings" },
+                  { icon: Wallet, label: "Manage Wallet", href: "/patient/wallet" },
+                  { icon: HelpCircle, label: "Help Center", href: null },
+                ].map((item) => (
+                  item.href ? (
+                    <Link key={item.label} href={item.href} className="flex items-center gap-3 w-full p-3 rounded-xl text-[#EDEDEF] text-sm hover:bg-white/[0.02] transition-colors">
+                      <item.icon className="w-4 h-4 text-[#8A8F98]" />
+                      {item.label}
+                    </Link>
+                  ) : (
+                    <button key={item.label} className="flex items-center gap-3 w-full p-3 rounded-xl text-[#EDEDEF] text-sm hover:bg-white/[0.02] transition-colors">
+                      <item.icon className="w-4 h-4 text-[#8A8F98]" />
+                      {item.label}
+                    </button>
+                  )
+                ))}
+                <button 
+                  onClick={logout}
+                  className="flex items-center gap-3 w-full p-3 rounded-xl text-red-400 text-sm hover:bg-red-500/10 transition-colors mt-2"
+                >
+                  <LogOut className="w-4 h-4" />
+                  Sign Out
+                </button>
+              </div>
             </motion.div>
 
-            {/* App Info */}
             <motion.div variants={itemVariants} className="text-center">
-              <p className="text-xs text-muted-foreground">MediChainAI v1.0.2 (Beta)</p>
-              <p className="text-[10px] text-muted-foreground/50 mt-1">Secured by Solana Blockchain</p>
+              <p className="text-xs text-[#8A8F98]">MediChainAI v1.0.2 (Beta)</p>
+              <p className="text-[10px] text-[#8A8F98]/50 mt-1">Secured by Solana Blockchain</p>
             </motion.div>
           </div>
         </div>

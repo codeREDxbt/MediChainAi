@@ -233,7 +233,7 @@ function ResultsContent() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-slate-950">
+      <div className="min-h-screen bg-[#050506]">
         <div className="lg:hidden">
           <TopBar title="AI Insights" showBack showLogo={false} showSettings />
         </div>
@@ -246,13 +246,13 @@ function ResultsContent() {
 
   if (error || !scan) {
     return (
-      <div className="min-h-screen bg-slate-950 flex items-center justify-center">
+      <div className="min-h-screen bg-[#050506] flex items-center justify-center">
         <div className="text-center space-y-4 p-6">
           <AlertCircle className="w-12 h-12 text-red-500 mx-auto" />
-          <h2 className="text-xl font-bold text-white">
+          <h2 className="text-xl font-bold text-[#EDEDEF]">
             {error || 'Scan not found'}
           </h2>
-          <p className="text-slate-400">
+          <p className="text-[#8A8F98]">
             The scan you're looking for doesn't exist or couldn't be loaded.
           </p>
         </div>
@@ -261,11 +261,8 @@ function ResultsContent() {
   }
 
   return (
-    <div className="flex flex-col min-h-[calc(100vh-64px)] relative overflow-hidden bg-transparent font-sans text-slate-200">
-      <Spotlight className="-top-40 right-0 md:right-60 md:-top-20 z-0" fill="white" />
-      <Spotlight className="top-40 left-0 md:left-20 z-0" fill="emerald" />
+    <div className="min-h-screen bg-[#050506] font-sans text-[#EDEDEF] selection:bg-[#5E6AD2]/30">
 
-      {/* Mobile TopBar */}
       <div className="lg:hidden relative z-10">
         <TopBar
           title="AI Insights"
@@ -286,13 +283,12 @@ function ResultsContent() {
         variants={containerVariants}
         initial="hidden"
         animate="visible"
-        className="flex-1 px-4 py-8 space-y-8 lg:px-0 lg:py-0 relative z-10"
+        className="max-w-5xl mx-auto px-4 py-8 lg:py-12 space-y-8"
       >
-        {/* Desktop Header */}
-        <motion.div variants={itemVariants} className="hidden lg:flex lg:items-center lg:justify-between lg:mb-8">
+        <motion.div variants={itemVariants} className="hidden lg:flex lg:items-center lg:justify-between">
           <div>
-            <h1 className="text-3xl font-bold text-white tracking-tight">AI Insights & Federated Status</h1>
-            <p className="text-sm text-slate-400 mt-1">
+            <h1 className="text-2xl font-bold text-[#EDEDEF] tracking-tight">AI Insights & Federated Status</h1>
+            <p className="text-sm text-[#8A8F98] mt-1">
               {scan ? `Viewing scan: ${scan.modality || scan.scanType}` : "Monitor your local model training and global synchronization"}
             </p>
           </div>
@@ -308,8 +304,8 @@ function ResultsContent() {
 
             {/* Scan Image Viewer with Lens */}
             <motion.div variants={itemVariants}>
-              <div className="relative w-full rounded-3xl overflow-hidden bg-slate-900 border border-white/10 p-2 shadow-2xl">
-                <div className="relative w-full aspect-video rounded-2xl overflow-hidden bg-black flex items-center justify-center group cursor-crosshair">
+              <div className="relative w-full rounded-2xl overflow-hidden bg-[#12121a] border border-white/[0.1] p-2">
+                <div className="relative w-full aspect-video rounded-xl overflow-hidden bg-black flex items-center justify-center group cursor-crosshair">
                   {scan?.imageUrl ? (
                     (() => {
                       const previewUrl = scan.convertedImageUrl || scan.imageUrl;
@@ -384,7 +380,7 @@ function ResultsContent() {
             </motion.div>
 
             {/* Simulated Training / Epoch Progress */}
-            <motion.div variants={itemVariants} className="relative rounded-3xl overflow-hidden border border-white/10 bg-slate-900">
+            <motion.div variants={itemVariants} className="relative rounded-2xl overflow-hidden border border-white/[0.1] bg-[#12121a]">
               <div className="absolute inset-0 w-full h-full opacity-100 mix-blend-screen">
                 <CanvasRevealEffect
                   animationSpeed={3}
@@ -483,14 +479,14 @@ function ResultsContent() {
           <div className="space-y-8 mt-8 lg:mt-0 flex flex-col">
             {/* Accuracy & Tokens */}
             <motion.div variants={itemVariants} className="grid grid-cols-2 gap-4">
-              <div className="relative rounded-3xl bg-slate-900 border border-white/10 p-6 flex flex-col justify-between overflow-hidden">
+              <div className="relative rounded-2xl bg-[#12121a] border border-white/[0.1] p-5 flex flex-col justify-between overflow-hidden">
                 <GlowingEffect spread={20} glow={true} className="z-0" />
                 <div className="relative z-10">
-                  <p className="text-[10px] font-bold text-slate-400 tracking-widest uppercase mb-4">
+                  <p className="text-[10px] font-bold text-[#8A8F98] tracking-widest uppercase mb-4">
                     MODEL CONFIDENCE
                   </p>
                   <div className="flex items-baseline gap-2 mb-6">
-                    <span className="text-4xl font-bold text-white tracking-tight">
+                    <span className="text-3xl font-bold text-[#EDEDEF] tracking-tight">
                       {scan?.confidence ? <NumberTicker value={scan.confidence} /> : "0"}%
                     </span>
                   </div>
@@ -503,7 +499,7 @@ function ResultsContent() {
                         transition={{ delay: 0.5 + i * 0.1, duration: 0.4 }}
                         className={cn(
                           "flex-1 rounded-full origin-left",
-                          scan?.confidence && i <= Math.ceil(scan.confidence / 20) ? "bg-emerald-500" : "bg-slate-800"
+                          scan?.confidence && i <= Math.ceil(scan.confidence / 20) ? "bg-emerald-500" : "bg-white/[0.06]"
                         )}
                       />
                     ))}
@@ -511,19 +507,19 @@ function ResultsContent() {
                 </div>
               </div>
 
-              <div className="relative rounded-3xl bg-slate-900 border border-white/10 p-6 flex flex-col justify-between overflow-hidden">
+              <div className="relative rounded-2xl bg-[#12121a] border border-white/[0.1] p-5 flex flex-col justify-between overflow-hidden">
                 <GlowingEffect spread={20} glow={true} className="z-0" />
                 <div className="relative z-10">
-                  <p className="text-[10px] font-bold text-slate-400 tracking-widest uppercase mb-4">
+                  <p className="text-[10px] font-bold text-[#8A8F98] tracking-widest uppercase mb-4">
                     REWARD TOKENS (MCI)
                   </p>
-                  <div className="text-4xl font-bold text-white tracking-tight mb-2">
+                  <div className="text-3xl font-bold text-[#EDEDEF] tracking-tight mb-2">
                     <NumberTicker value={displayTokens} />
                   </div>
-                  <p className="text-xs text-slate-500 font-medium">
+                  <p className="text-xs text-[#8A8F98] font-medium">
                     Solana Devnet
                   </p>
-                  <div className="flex items-center gap-1.5 mt-4 text-emerald-500/80 bg-emerald-500/10 w-fit px-2.5 py-1 rounded-md text-xs font-medium border border-emerald-500/20">
+                  <div className="flex items-center gap-1.5 mt-4 text-emerald-400/80 bg-emerald-500/10 w-fit px-2.5 py-1 rounded-md text-xs font-medium border border-emerald-500/20">
                     <Wallet className="w-3.5 h-3.5" />
                     Secure Wallet Connected
                   </div>

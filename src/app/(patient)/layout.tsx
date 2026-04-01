@@ -11,8 +11,7 @@ export default function PatientLayout({
 }) {
   return (
     <AuthGuard allowedRoles={["patient"]}>
-      <div className="dark text-foreground bg-slate-950 min-h-screen relative overflow-x-hidden">
-        {/* Aceternity UI Background Beams */}
+      <div className="dark text-[#EDEDEF] bg-[#050506] min-h-screen relative overflow-x-hidden font-sans">
         <div className="fixed inset-0 z-0 pointer-events-none">
           <BackgroundBeams />
         </div>

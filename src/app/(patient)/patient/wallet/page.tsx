@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from "react";
 import { TopBar } from "@/components/top-bar";
-import { Card, CardBody, Button, Chip } from "@heroui/react";
 import {
   ArrowUp, ArrowDown, Layers, Eye, EyeOff, ExternalLink,
   TrendingUp, Coins, Zap, Award, Database, ArrowRight,
@@ -11,7 +10,7 @@ import { useAuth } from "@/lib/auth-context";
 import { SparklesCore } from "@/components/ui/sparkles";
 import { GlowingEffect } from "@/components/ui/glowing-effect";
 import { NumberTicker } from "@/components/ui/number-ticker";
-import { motion } from "motion/react";
+import { motion } from "framer-motion";
 
 interface FederatedStatus {
   localRound: number;
@@ -27,16 +26,16 @@ interface FederatedStatus {
   networkNodes: number;
 }
 
-const containerVariants = { hidden: { opacity: 0 }, visible: { opacity: 1, transition: { staggerChildren: 0.1 } } };
-const itemVariants = { hidden: { opacity: 0, y: 20 }, visible: { opacity: 1, y: 0, transition: { duration: 0.5, ease: "easeOut" } } };
+const containerVariants = { hidden: { opacity: 0 }, visible: { opacity: 1, transition: { staggerChildren: 0.08 } } };
+const itemVariants = { hidden: { opacity: 0, y: 16 }, visible: { opacity: 1, y: 0, transition: { duration: 0.4 } } };
 
-function ActionButton({ icon: Icon, label, highlighted = false }: { icon: React.ElementType; label: string; highlighted?: boolean }) {
+function ActionButton({ icon: Icon, label, highlighted = false }: { icon: React.ComponentType<{ className?: string }>; label: string; highlighted?: boolean }) {
   return (
     <div className="flex flex-col items-center gap-2">
-      <Button isIconOnly variant={highlighted ? "solid" : "flat"} color={highlighted ? "primary" : "default"} className="w-14 h-14 rounded-2xl">
+      <button className={`w-14 h-14 rounded-xl flex items-center justify-center transition-all ${highlighted ? "bg-[#5E6AD2] text-white hover:bg-[#6872D9]" : "bg-[#050506] text-[#8A8F98] border border-white/[0.06] hover:text-[#EDEDEF] hover:border-white/[0.1]"}`}>
         <Icon className="w-6 h-6" />
-      </Button>
-      <span className="text-xs font-medium text-muted-foreground">{label}</span>
+      </button>
+      <span className="text-xs font-medium text-[#8A8F98]">{label}</span>
     </div>
   );
 }
@@ -96,66 +95,69 @@ export default function PatientWalletPage() {
   ];
 
   return (
-    <div className="flex flex-col min-h-screen">
+    <div className="min-h-screen bg-[#050506] font-sans text-[#EDEDEF] selection:bg-[#5E6AD2]/30">
       <div className="lg:hidden">
-        <TopBar title="Wallet" showLogo={false} showSettings rightContent={<Chip variant="flat" className="font-mono text-xs"><span className="w-2 h-2 rounded-full bg-emerald-500 inline-block mr-1" />{displayAddress}</Chip>} />
+        <TopBar title="Wallet" showLogo={false} showSettings rightContent={
+          <span className="font-mono text-xs text-[#8A8F98] flex items-center gap-1.5">
+            <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block" />
+            {displayAddress}
+          </span>
+        } />
       </div>
 
-      <motion.main variants={containerVariants} initial="hidden" animate="visible" className="flex-1 px-4 py-6 space-y-6 lg:px-0 lg:py-0">
-        <motion.div variants={itemVariants} className="hidden lg:flex lg:items-center lg:justify-between lg:mb-2">
+      <motion.main variants={containerVariants} initial="hidden" animate="visible" className="max-w-5xl mx-auto px-4 py-8 lg:py-12 space-y-6">
+        <motion.div variants={itemVariants} className="hidden lg:flex lg:items-center lg:justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-foreground">Wallet</h1>
-            <p className="text-muted-foreground text-sm">Manage your MCI tokens and transactions</p>
+            <h1 className="text-2xl font-bold text-[#EDEDEF] tracking-tight">Wallet</h1>
+            <p className="text-sm text-[#8A8F98]">Manage your MCI tokens and transactions</p>
           </div>
-          <Chip variant="flat" size="lg" className="font-mono text-sm px-4 py-2"><span className="w-2 h-2 rounded-full bg-emerald-500 inline-block mr-2 animate-pulse" />{displayAddress}</Chip>
+          <span className="font-mono text-sm text-[#8A8F98] flex items-center gap-2 px-4 py-2 rounded-xl bg-[#12121a] border border-white/[0.06]">
+            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+            {displayAddress}
+          </span>
         </motion.div>
 
         <div className="lg:grid lg:grid-cols-3 lg:gap-6">
-          {/* Balance Card with Sparkles + GlowingEffect */}
           <motion.div variants={itemVariants} className="relative rounded-2xl lg:col-span-1">
-            <div className="relative rounded-2xl border border-primary/20 overflow-hidden">
+            <div className="relative rounded-2xl border border-[#5E6AD2]/20 overflow-hidden bg-[#12121a]">
               <GlowingEffect spread={40} glow={true} disabled={false} proximity={64} inactiveZone={0.01} borderWidth={2} />
-              <Card className="overflow-hidden bg-gradient-to-b from-card to-primary/5 rounded-2xl">
-                <CardBody className="p-6 relative">
-                  <div className="absolute inset-0 z-0 opacity-40">
-                    <SparklesCore id="walletSparkles" background="transparent" minSize={0.3} maxSize={1} particleDensity={30} className="w-full h-full" particleColor="#3b82f6" speed={0.8} />
+              <div className="p-6 relative">
+                <div className="absolute inset-0 z-0 opacity-40">
+                  <SparklesCore id="walletSparkles" background="transparent" minSize={0.3} maxSize={1} particleDensity={30} className="w-full h-full" particleColor="#5E6AD2" speed={0.8} />
+                </div>
+                <div className="relative z-10">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs font-medium text-[#8A8F98] uppercase tracking-wider">Total Balance</span>
+                    <button onClick={() => setBalanceVisible(!balanceVisible)} className="p-1.5 rounded-lg hover:bg-white/[0.04] text-[#8A8F98] hover:text-[#EDEDEF] transition-colors">
+                      {balanceVisible ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
+                    </button>
                   </div>
-                  <div className="relative z-10">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Total Balance</span>
-                      <button onClick={() => setBalanceVisible(!balanceVisible)} className="p-1.5 rounded-lg hover:bg-muted/50 text-muted-foreground hover:text-foreground transition-colors">
-                        {balanceVisible ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
-                      </button>
-                    </div>
-                    <div className="mb-1">
-                      <span className="text-4xl font-bold text-primary lg:text-5xl tracking-tight">
-                        {balanceVisible ? (numericBalance > 0 ? <NumberTicker value={numericBalance} className="text-primary" decimalPlaces={2} /> : displayBalance) : "••••"}
-                      </span>
-                      <span className="text-lg text-primary/80 ml-2 font-semibold">MCI</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <p className="text-sm text-muted-foreground">≈ ${balanceVisible ? usdValue : "••••"} USD</p>
-                      <span className="text-xs font-medium text-emerald-500 flex items-center gap-0.5"><TrendingUp className="w-3 h-3" />+0.0%</span>
-                    </div>
-                    <div className="flex justify-center gap-4 mt-6">
-                      <ActionButton icon={ArrowUp} label="Send" />
-                      <ActionButton icon={ArrowDown} label="Receive" />
-                      <ActionButton icon={Layers} label="Stake" highlighted />
-                    </div>
+                  <div className="mb-1">
+                    <span className="text-4xl font-bold text-[#5E6AD2] lg:text-5xl tracking-tight">
+                      {balanceVisible ? (numericBalance > 0 ? <NumberTicker value={numericBalance} className="text-[#5E6AD2]" decimalPlaces={2} /> : displayBalance) : "••••"}
+                    </span>
+                    <span className="text-lg text-[#5E6AD2]/80 ml-2 font-semibold">MCI</span>
                   </div>
-                </CardBody>
-              </Card>
+                  <div className="flex items-center gap-2">
+                    <p className="text-sm text-[#8A8F98]">≈ ${balanceVisible ? usdValue : "••••"} USD</p>
+                    <span className="text-xs font-medium text-emerald-400 flex items-center gap-0.5"><TrendingUp className="w-3 h-3" />+0.0%</span>
+                  </div>
+                  <div className="flex justify-center gap-4 mt-6">
+                    <ActionButton icon={ArrowUp} label="Send" />
+                    <ActionButton icon={ArrowDown} label="Receive" />
+                    <ActionButton icon={Layers} label="Stake" highlighted />
+                  </div>
+                </div>
+              </div>
             </div>
           </motion.div>
 
-          {/* Right Column */}
           <div className="space-y-6 mt-6 lg:mt-0 lg:col-span-2">
-            {/* Earnings Chart */}
             <motion.div variants={itemVariants}>
-              <Card><CardBody className="p-5">
+              <div className="bg-[#12121a] border border-white/[0.06] rounded-2xl p-5">
                 <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center gap-2"><Coins className="w-5 h-5 text-primary" /><h3 className="font-semibold text-foreground">Earnings History</h3></div>
-                  <Button variant="light" size="sm" className="text-xs text-muted-foreground">Last 7 months</Button>
+                  <div className="flex items-center gap-2"><Coins className="w-5 h-5 text-[#5E6AD2]" /><h3 className="font-semibold text-[#EDEDEF]">Earnings History</h3></div>
+                  <button className="text-xs text-[#8A8F98] hover:text-[#EDEDEF] transition-colors">Last 7 months</button>
                 </div>
                 <div className="flex items-end justify-between gap-3 h-36">
                   {earningsData.map((item, index) => {
@@ -163,51 +165,53 @@ export default function PatientWalletPage() {
                     const heightPct = (item.value / maxVal) * 100;
                     return (
                       <motion.div key={item.month} initial={{ opacity: 0, scaleY: 0 }} animate={{ opacity: 1, scaleY: 1 }} transition={{ delay: 0.3 + index * 0.08, duration: 0.5, ease: "easeOut" }} className="flex-1 flex flex-col items-center gap-1.5 origin-bottom">
-                        <span className="text-xs font-medium text-foreground">{item.value}</span>
+                        <span className="text-xs font-medium text-[#EDEDEF]">{item.value}</span>
                         <div className="w-full relative rounded-t-lg overflow-hidden" style={{ height: `${heightPct}%` }}>
-                          <div className="absolute inset-0 bg-gradient-to-t from-primary/80 to-primary/30 rounded-t-lg" />
+                          <div className="absolute inset-0 bg-gradient-to-t from-[#5E6AD2]/80 to-[#5E6AD2]/30 rounded-t-lg" />
                         </div>
-                        <span className="text-xs text-muted-foreground">{item.month}</span>
+                        <span className="text-xs text-[#8A8F98]">{item.month}</span>
                       </motion.div>
                     );
                   })}
                 </div>
-              </CardBody></Card>
+              </div>
             </motion.div>
 
-            {/* Recent Activity */}
             <motion.div variants={itemVariants}>
-              <Card><CardBody className="p-5">
+              <div className="bg-[#12121a] border border-white/[0.06] rounded-2xl p-5">
                 <div className="flex items-center justify-between mb-4">
-                  <h3 className="font-semibold text-foreground">Recent Activity</h3>
-                  <Button variant="light" size="sm" className="text-xs text-muted-foreground" endContent={<ArrowRight className="w-3 h-3" />}>View All</Button>
+                  <h3 className="font-semibold text-[#EDEDEF]">Recent Activity</h3>
+                  <button className="text-xs text-[#8A8F98] hover:text-[#EDEDEF] transition-colors flex items-center gap-1">
+                    View All
+                    <ArrowRight className="w-3 h-3" />
+                  </button>
                 </div>
                 <div className="space-y-1">
                   {recentActivity.map((item, i) => {
                     const Icon = item.icon;
                     return (
-                      <motion.div key={i} initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.5 + i * 0.08 }} className="flex items-center gap-4 p-3 rounded-xl hover:bg-muted/30 transition-colors">
+                      <motion.div key={i} initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.5 + i * 0.08 }} className="flex items-center gap-4 p-3 rounded-xl hover:bg-white/[0.02] transition-colors">
                         <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${item.type === "earning" ? "bg-emerald-500/10" : "bg-amber-500/10"}`}>
-                          <Icon className={`w-5 h-5 ${item.type === "earning" ? "text-emerald-500" : "text-amber-500"}`} />
+                          <Icon className={`w-5 h-5 ${item.type === "earning" ? "text-emerald-400" : "text-amber-400"}`} />
                         </div>
                         <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-foreground">{item.title}</p>
-                          <p className="text-xs text-muted-foreground">{item.time}</p>
+                          <p className="text-sm font-medium text-[#EDEDEF]">{item.title}</p>
+                          <p className="text-xs text-[#8A8F98]">{item.time}</p>
                         </div>
                         <div className="text-right">
-                          <p className={`text-sm font-semibold ${item.type === "earning" ? "text-emerald-500" : "text-amber-500"}`}>{item.amount}</p>
-                          {item.verified && <button className="text-xs text-primary hover:underline flex items-center gap-0.5 ml-auto">Verified <ExternalLink className="w-3 h-3" /></button>}
+                          <p className={`text-sm font-semibold ${item.type === "earning" ? "text-emerald-400" : "text-amber-400"}`}>{item.amount}</p>
+                          {item.verified && <button className="text-xs text-[#5E6AD2] hover:underline flex items-center gap-0.5 ml-auto">Verified <ExternalLink className="w-3 h-3" /></button>}
                         </div>
                       </motion.div>
                     );
                   })}
                 </div>
-              </CardBody></Card>
+              </div>
             </motion.div>
           </div>
         </div>
 
-        <motion.div variants={itemVariants} className="flex items-center justify-center gap-2 py-3 text-xs text-muted-foreground">
+        <motion.div variants={itemVariants} className="flex items-center justify-center gap-2 py-3 text-xs text-[#8A8F98]">
           <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />Solana Devnet: Connected<span className="mx-1">•</span>MCI is currently a testnet token.
         </motion.div>
       </motion.main>
