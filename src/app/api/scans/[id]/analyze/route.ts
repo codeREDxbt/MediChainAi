@@ -9,6 +9,15 @@ import { getOrCreateAssociatedTokenAccount, mintTo } from "@solana/spl-token";
 import bs58 from "bs58";
 import dicomParser from "dicom-parser";
 import { PNG } from "pngjs";
+import {
+  callMonaiService,
+  combineProviderConfidence,
+  getFileExtension,
+  isMonaiSupported,
+  mergeAnalysisFindings,
+  type AnalysisFindings,
+  type MonaiResponse,
+} from "@/lib/monai";
 
 const VISION_MODEL = "meta-llama/llama-3.2-11b-vision-instruct";
 
@@ -21,35 +30,15 @@ const SUPPORTED_VISION_EXTENSIONS = new Set([
   "bmp",
 ]);
 
-type Findings = {
-  summary: string;
-  details: string[];
-  urgent: boolean;
-};
+type Findings = AnalysisFindings;
 
 type ParserMode = "fenced-json" | "embedded-json" | "plain-text";
 
 type AnalysisResult = {
-  confidence: number;
+  confidence: number | null;
   findings: Findings;
   parserMode: ParserMode;
 };
-
-const MODALITY_BASE_CONFIDENCE: Record<string, number> = {
-  xray: 76,
-  ct: 72,
-  mri: 70,
-  ultrasound: 68,
-  pet: 67,
-  mammography: 73,
-  unknown: 66,
-};
-
-function getFileExtension(filePath: string): string {
-  const normalized = filePath.toLowerCase();
-  if (normalized.endsWith(".nii.gz")) return "nii.gz";
-  return normalized.split(".").pop() || "bin";
-}
 
 function isVisionSupported(filePath: string): boolean {
   return SUPPORTED_VISION_EXTENSIONS.has(getFileExtension(filePath));
@@ -82,14 +71,18 @@ function toPngPreviewFromDicom(buffer: Buffer): Buffer | null {
     if (!Number.isFinite(pixelCount) || pixelCount <= 0 || pixelCount > 4096 * 4096) return null;
 
     const offset = pixelDataElement.dataOffset;
+    const bytesNeeded = bitsAllocated > 8 ? pixelCount * 2 : pixelCount;
+    if (offset < 0 || offset + bytesNeeded > buffer.byteLength) return null;
+
+    const pixelSlice = buffer.slice(offset, offset + bytesNeeded);
     let pixels: Int16Array | Uint8Array | Uint16Array;
 
     if (bitsAllocated > 8) {
       pixels = pixelRepresentation === 1
-        ? new Int16Array(buffer.buffer, buffer.byteOffset + offset, pixelCount)
-        : new Uint16Array(buffer.buffer, buffer.byteOffset + offset, pixelCount);
+        ? new Int16Array(pixelSlice.buffer, pixelSlice.byteOffset, pixelCount)
+        : new Uint16Array(pixelSlice.buffer, pixelSlice.byteOffset, pixelCount);
     } else {
-      pixels = new Uint8Array(buffer.buffer, buffer.byteOffset + offset, pixelCount);
+      pixels = new Uint8Array(pixelSlice.buffer, pixelSlice.byteOffset, pixelCount);
     }
 
     const rescaleIntercept = parseFirstNumber(dataSet.string('x00281052')) ?? 0;
@@ -202,43 +195,167 @@ function extractModelText(content: unknown): string {
   return "";
 }
 
+function normalizeReportLine(value: string): string {
+  return value
+    .replace(/```json|```/gi, "")
+    .replace(/\*\*/g, "")
+    .replace(/^[-*•]\s+/, "")
+    .replace(/^\d+\.\s+/, "")
+    .replace(/^(summary|details|findings|observations|urgency)\s*:\s*/i, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function normalizeLines(lines: string[]): string[] {
+  const seen = new Set<string>();
+  const output: string[] = [];
+
+  for (const line of lines) {
+    const cleaned = normalizeReportLine(line);
+    if (!cleaned) continue;
+
+    const key = cleaned.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+    if (!key || seen.has(key)) continue;
+
+    seen.add(key);
+    output.push(cleaned);
+  }
+
+  return output;
+}
+
 function toDetailsFromText(text: string): string[] {
-  return text
-    .split(/\n|\.|;/)
+  const lines = text
+    .split(/\r?\n/)
     .map((line) => line.trim())
-    .filter((line) => line.length > 10)
-    .slice(0, 6);
+    .filter(Boolean);
+
+  const bulletLines = lines.filter((line) => /^[-*•]\s+/.test(line) || /^\d+\.\s+/.test(line));
+  if (bulletLines.length > 0) {
+    return normalizeLines(bulletLines).slice(0, 8);
+  }
+
+  return normalizeLines(
+    text
+      .split(/\n|\.|;/)
+      .map((line) => line.trim())
+      .filter((line) => line.length > 10)
+  ).slice(0, 8);
 }
 
 function inferUrgency(text: string): boolean {
   return /(urgent|emergency|critical|acute hemorrhage|pneumothorax|stroke|severe)/i.test(text);
 }
 
-function normalizeModality(modality: string): string {
-  const normalized = modality.toLowerCase();
-  if (normalized.includes("xray") || normalized.includes("x-ray")) return "xray";
-  if (normalized.includes("ct")) return "ct";
-  if (normalized.includes("mri")) return "mri";
-  if (normalized.includes("ultra")) return "ultrasound";
-  if (normalized.includes("pet")) return "pet";
-  if (normalized.includes("mammo")) return "mammography";
-  return "unknown";
+function normalizeConfidenceValue(value: unknown): number | null {
+  if (typeof value === "string") {
+    const match = value.match(/-?\d+(?:\.\d+)?/);
+    if (!match) return null;
+    value = Number(match[0]);
+  }
+
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    return null;
+  }
+
+  const normalized = value > 0 && value <= 1 ? value * 100 : value;
+  return Math.max(0, Math.min(100, Math.round(normalized * 10) / 10));
 }
 
-function calibrateConfidence(args: {
-  modality: string;
-  parserMode: ParserMode;
-  detailsCount: number;
-  summaryLength: number;
-  urgent: boolean;
-}): number {
-  const modalityKey = normalizeModality(args.modality);
-  const base = MODALITY_BASE_CONFIDENCE[modalityKey] ?? MODALITY_BASE_CONFIDENCE.unknown;
-  const parserBoost = args.parserMode === "fenced-json" ? 10 : args.parserMode === "embedded-json" ? 7 : 2;
-  const detailsBoost = Math.min(8, args.detailsCount * 2);
-  const summaryBoost = args.summaryLength > 120 ? 4 : args.summaryLength > 50 ? 2 : 0;
-  const urgencyPenalty = args.urgent ? 6 : 0;
-  return Math.max(52, Math.min(95, base + parserBoost + detailsBoost + summaryBoost - urgencyPenalty));
+function extractConfidenceFromText(text: string): number | null {
+  const match = text.match(/confidence\s*[:=-]?\s*(-?\d+(?:\.\d+)?)(?:\s*%|\b)/i);
+  return normalizeConfidenceValue(match?.[1] ?? null);
+}
+
+function parseStructuredPlainTextReport(text: string): AnalysisResult | null {
+  const lines = text
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+  if (lines.length === 0) return null;
+
+  let currentSection: "summary" | "details" | "urgency" | "confidence" | null = null;
+  const summaryParts: string[] = [];
+  const detailParts: string[] = [];
+  const urgencyParts: string[] = [];
+  let confidence: number | null = null;
+
+  for (const rawLine of lines) {
+    const normalized = rawLine.replace(/\*\*/g, "").trim();
+
+    if (/^(summary|overview)\s*:?\s*$/i.test(normalized)) {
+      currentSection = "summary";
+      continue;
+    }
+    if (/^(details|findings|observations)\s*:?\s*$/i.test(normalized)) {
+      currentSection = "details";
+      continue;
+    }
+    if (/^(urgency|urgent)\s*:?\s*$/i.test(normalized)) {
+      currentSection = "urgency";
+      continue;
+    }
+    if (/^confidence\s*:?\s*$/i.test(normalized)) {
+      currentSection = "confidence";
+      continue;
+    }
+
+    if (/^(summary|overview)\s*:/i.test(normalized)) {
+      summaryParts.push(normalizeReportLine(normalized));
+      currentSection = "summary";
+      continue;
+    }
+    if (/^(details|findings|observations)\s*:/i.test(normalized)) {
+      const cleaned = normalizeReportLine(normalized);
+      if (cleaned) detailParts.push(cleaned);
+      currentSection = "details";
+      continue;
+    }
+    if (/^(urgency|urgent)\s*:/i.test(normalized)) {
+      urgencyParts.push(normalizeReportLine(normalized));
+      currentSection = "urgency";
+      continue;
+    }
+    if (/^confidence\s*:/i.test(normalized)) {
+      confidence = normalizeConfidenceValue(normalized);
+      currentSection = "confidence";
+      continue;
+    }
+
+    const isBullet = /^[-*•]\s+/.test(rawLine) || /^\d+\.\s+/.test(rawLine);
+    const cleaned = normalizeReportLine(rawLine);
+    if (!cleaned) continue;
+
+    if (currentSection === "confidence") {
+      confidence = normalizeConfidenceValue(cleaned);
+    } else if (currentSection === "urgency") {
+      urgencyParts.push(cleaned);
+    } else if (currentSection === "details" || isBullet) {
+      detailParts.push(cleaned);
+    } else if (currentSection === "summary" || summaryParts.length === 0) {
+      summaryParts.push(cleaned);
+    } else {
+      detailParts.push(cleaned);
+    }
+  }
+
+  const summary = normalizeLines(summaryParts).join(" ").trim() || "";
+  const details = normalizeLines(detailParts)
+    .filter((detail) => detail.toLowerCase() !== summary.toLowerCase())
+    .slice(0, 8);
+
+  if (!summary && details.length === 0) return null;
+
+  return {
+    confidence,
+    parserMode: "plain-text",
+    findings: {
+      summary: summary || details[0] || "Analysis complete.",
+      details: details.length > 0 ? details : ["Model returned only a short narrative summary."],
+      urgent: urgencyParts.length > 0 ? inferUrgency(urgencyParts.join(" ")) : inferUrgency(text),
+    },
+  };
 }
 
 function aggregateAnalyses(results: AnalysisResult[]): AnalysisResult {
@@ -250,15 +367,13 @@ function aggregateAnalyses(results: AnalysisResult[]): AnalysisResult {
     "plain-text": 0.75,
   };
 
-  let weightedTotal = 0;
-  let totalWeight = 0;
   const mergedDetails: string[] = [];
   let urgent = false;
+  const confidenceValues = results
+    .map((result) => result.confidence)
+    .filter((value): value is number => typeof value === "number");
 
   for (const result of results) {
-    const weight = modeWeight[result.parserMode];
-    weightedTotal += result.confidence * weight;
-    totalWeight += weight;
     urgent = urgent || result.findings.urgent;
     for (const detail of result.findings.details) {
       if (!mergedDetails.includes(detail)) {
@@ -271,13 +386,15 @@ function aggregateAnalyses(results: AnalysisResult[]): AnalysisResult {
     if (a.parserMode !== b.parserMode) {
       return modeWeight[b.parserMode] - modeWeight[a.parserMode];
     }
-    return b.findings.summary.length - a.findings.summary.length;
+      return b.findings.summary.length - a.findings.summary.length;
   })[0];
 
-  const consensusConfidence = Math.max(52, Math.min(95, Math.round(weightedTotal / Math.max(totalWeight, 1))));
+  const averagedConfidence = confidenceValues.length > 0
+    ? Math.round((confidenceValues.reduce((sum, value) => sum + value, 0) / confidenceValues.length) * 10) / 10
+    : null;
 
   return {
-    confidence: consensusConfidence,
+    confidence: averagedConfidence,
     parserMode: preferred.parserMode,
     findings: {
       summary: preferred.findings.summary,
@@ -287,7 +404,7 @@ function aggregateAnalyses(results: AnalysisResult[]): AnalysisResult {
   };
 }
 
-function coerceAiResponseToStructured(responseText: string, modality: string): AnalysisResult {
+function coerceAiResponseToStructured(responseText: string, _modality: string): AnalysisResult {
   const trimmed = responseText.trim();
 
   // Strategy 1: fenced JSON block
@@ -299,15 +416,8 @@ function coerceAiResponseToStructured(responseText: string, modality: string): A
       ? parsed.details.map((d: unknown) => String(d)).filter(Boolean)
       : [];
     const summary = String(parsed.summary || "Analysis complete.");
-    const confidence = calibrateConfidence({
-      modality,
-      parserMode: "fenced-json",
-      detailsCount: details.length,
-      summaryLength: summary.length,
-      urgent,
-    });
     return {
-      confidence,
+      confidence: normalizeConfidenceValue(parsed.confidence),
       parserMode: "fenced-json",
       findings: {
         summary,
@@ -328,15 +438,8 @@ function coerceAiResponseToStructured(responseText: string, modality: string): A
       ? parsed.details.map((d: unknown) => String(d)).filter(Boolean)
       : [];
     const summary = String(parsed.summary || "Analysis complete.");
-    const confidence = calibrateConfidence({
-      modality,
-      parserMode: "embedded-json",
-      detailsCount: details.length,
-      summaryLength: summary.length,
-      urgent,
-    });
     return {
-      confidence,
+      confidence: normalizeConfidenceValue(parsed.confidence),
       parserMode: "embedded-json",
       findings: {
         summary,
@@ -346,20 +449,20 @@ function coerceAiResponseToStructured(responseText: string, modality: string): A
     };
   }
 
+  const structuredPlainText = parseStructuredPlainTextReport(trimmed);
+  if (structuredPlainText) {
+    return structuredPlainText;
+  }
+
   // Strategy 3: plain-text fallback from model output (not hardcoded clinical content)
   const details = toDetailsFromText(trimmed);
   const urgent = inferUrgency(trimmed);
-  const summary = trimmed.split(/\n|\./).map((line) => line.trim()).find((line) => line.length > 20) || "Analysis complete.";
-  const confidence = calibrateConfidence({
-    modality,
-    parserMode: "plain-text",
-    detailsCount: details.length,
-    summaryLength: summary.length,
-    urgent,
-  });
+  const summary = normalizeReportLine(
+    trimmed.split(/\n|\./).map((line) => line.trim()).find((line) => line.length > 20) || "Analysis complete."
+  );
 
   return {
-    confidence,
+    confidence: extractConfidenceFromText(trimmed),
     parserMode: "plain-text",
     findings: {
       summary,
@@ -370,15 +473,19 @@ function coerceAiResponseToStructured(responseText: string, modality: string): A
 }
 
 async function analyzeWithVisionAI(imageUrl: string, modality: string): Promise<AnalysisResult> {
-  const prompt = `You are a highly experienced medical imaging expert and board-certified radiologist. Analyze this ${modality || 'medical'} scan comprehensively and provide a structured radiological report.
+  const prompt = `You are reviewing a ${modality || 'medical'} scan for an everyday user.
 
-Your analysis must include:
-1. "summary": A concise diagnostic impression (2-3 sentences max).
-2. "details": A detailed, anatomical breakdown of your findings as a strict JSON array of strings. Include organ systems evaluated, contrast presence, artifacts, and primary pathological observations. Make these highly technical and clinical.
-3. "urgent": A boolean value indicating if emergency intervention or immediate clinical correlation is required.
+Rules:
+1. Use only what is visibly supported by the image.
+2. Do not invent anatomy, diseases, contrast use, or body regions that are not clearly visible.
+3. If the uploaded image does not look like the stated scan type, say that clearly.
+4. Write in plain English, not dense radiology jargon.
+5. Provide useful bullet-style points, not vague filler.
+6. Do not use markdown headings, bold text, or preambles.
+7. Do not say you are waiting for an image. The image is already included in this request.
 
-Respond strictly and ONLY in valid JSON format:
-{"summary": "Radiological impression summary", "details": ["observation 1", "observation 2", "observation 3"], "urgent": true/false}`;
+Return strict JSON with this exact shape:
+{"summary":"1-2 sentence plain-English overview of what this image most likely shows and any uncertainty.","details":["6 to 10 short bullet-ready points for a normal user, including visible body part, scan appearance, any obvious abnormal-looking area, image quality/limits, and what uncertainty remains."],"urgent":true/false}`;
 
   try {
     if (!process.env.OPENROUTER_API_KEY) {
@@ -397,13 +504,19 @@ Respond strictly and ONLY in valid JSON format:
       },
       body: JSON.stringify({
         model: VISION_MODEL,
-        messages: [{
-          role: "user",
-          content: [
-            { type: "image_url", image_url: { url: imageUrl } },
-            { type: "text", text: prompt }
-          ]
-        }],
+        messages: [
+          {
+            role: "system",
+            content: "Return valid JSON only. Do not use markdown, code fences, headings, or any preamble."
+          },
+          {
+            role: "user",
+            content: [
+              { type: "text", text: prompt },
+              { type: "image_url", image_url: { url: imageUrl } }
+            ]
+          }
+        ],
         max_tokens: 1024,
         temperature: 0.3,
       })
@@ -423,7 +536,11 @@ Respond strictly and ONLY in valid JSON format:
     }
 
     try {
-      return coerceAiResponseToStructured(responseText, modality);
+      const structured = coerceAiResponseToStructured(responseText, modality);
+      return {
+        ...structured,
+        confidence: null,
+      };
     } catch (parseError) {
       console.error("AI response coercion error:", parseError);
       throw new Error("Failed to parse AI response into report structure");
@@ -449,22 +566,82 @@ function buildAnalysisCandidates(originalFilePath: string, convertedFilePath: st
   return candidates.slice(0, 2);
 }
 
+function describeUnknownError(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  if (typeof error === "string") return error;
+  if (error && typeof error === "object") {
+    const record = error as Record<string, unknown>;
+    const preferred = record.message ?? record.error ?? record.detail ?? record.details;
+    if (typeof preferred === "string" && preferred.trim()) return preferred;
+    try {
+      return JSON.stringify(error);
+    } catch {
+      return String(error);
+    }
+  }
+  return String(error);
+}
+
+function isProviderReachableUrl(url: string): boolean {
+  return !/localhost|127\.0\.0\.1|0\.0\.0\.0/i.test(url);
+}
+
+function isLocalSupabaseStorage(): boolean {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
+  return /localhost|127\.0\.0\.1|0\.0\.0\.0/i.test(supabaseUrl);
+}
+
+function resolveAnalysisModality(args: {
+  storedModality?: string | null;
+  originalName?: string | null;
+  filePath: string;
+}): string {
+  const stored = (args.storedModality || "").trim();
+  const normalizedStored = stored.toLowerCase();
+  const ext = getFileExtension(args.filePath);
+  const isImage = ["jpg", "jpeg", "png", "webp", "bmp"].includes(ext);
+  const name = (args.originalName || args.filePath).toLowerCase();
+
+  if (normalizedStored === "xray" || normalizedStored === "x-ray") return "X-Ray";
+  if (normalizedStored === "ultrasound") return "Ultrasound";
+  if (normalizedStored === "mammography") return "Mammography";
+  if (normalizedStored === "pet") return "PET";
+  if (normalizedStored === "mri") return "MRI";
+  if (normalizedStored === "ct") return "CT";
+
+  if (isImage) {
+    if (name.includes("xray") || name.includes("x-ray") || name.includes("cxr")) return "X-Ray";
+    return "CT";
+  }
+
+  if (name.includes("mri") || name.includes("_mr") || name.includes("-mr")) return "MRI";
+  if (name.includes("pet")) return "PET";
+  if (name.includes("mammo")) return "Mammography";
+  if (name.includes("ultra")) return "Ultrasound";
+  if (name.includes("xray") || name.includes("x-ray") || name.includes("cxr")) return "X-Ray";
+  return ext === "dcm" ? "CT" : "X-Ray";
+}
+
 async function getAccessibleImageUrl(filePath: string): Promise<string> {
   if (!isVisionSupported(filePath)) {
     throw new Error(`Unsupported file type for vision model: .${getFileExtension(filePath)}`);
   }
 
+  if (!isLocalSupabaseStorage()) {
   // Try to create a signed URL first (works for private buckets)
-  const { data: signedData, error: signedError } = await supabaseServer.storage
-    .from("scans")
-    .createSignedUrl(filePath, 3600); // 1 hour expiry
+    const { data: signedData, error: signedError } = await supabaseServer.storage
+      .from("scans")
+      .createSignedUrl(filePath, 3600); // 1 hour expiry
 
-  if (signedData?.signedUrl && !signedError) {
-    console.log("Using signed URL for AI analysis");
-    return signedData.signedUrl;
+    if (signedData?.signedUrl && !signedError && isProviderReachableUrl(signedData.signedUrl)) {
+      console.log("Using signed URL for AI analysis");
+      return signedData.signedUrl;
+    }
+
+    console.log("Signed URL unavailable or not remotely reachable, falling back to base64:", signedError || signedData?.signedUrl);
+  } else {
+    console.log("Local Supabase detected, using base64 image payload for Vision AI.");
   }
-
-  console.log("Signed URL failed, falling back to base64:", signedError);
 
   // Fallback: download and convert to base64 data URI
   const { data: fileData, error: fileError } = await supabaseServer.storage
@@ -536,10 +713,16 @@ export async function POST(
     }
 
     const { id: scanId } = await params;
+    const monaiUrl = process.env.MONAI_SERVICE_URL;
+    const monaiSharedSecret = process.env.MONAI_SHARED_SECRET;
+    const openRouterEnabled = !!process.env.OPENROUTER_API_KEY;
 
-    if (!process.env.OPENROUTER_API_KEY) {
+    if (!openRouterEnabled && !monaiUrl) {
       return NextResponse.json(
-        { error: "AI analysis is not configured", details: "OPENROUTER_API_KEY is missing" },
+        {
+          error: "AI analysis is not configured",
+          details: "Set MONAI_SERVICE_URL and/or OPENROUTER_API_KEY before running analysis.",
+        },
         { status: 503 }
       );
     }
@@ -561,75 +744,140 @@ export async function POST(
       ? scan.analysis_results[0]
       : scan.analysis_results;
     const hasAnalysis = !!existingAnalysis;
-
-    if (hasAnalysis) {
-      return NextResponse.json({ error: "Scan is already analyzed" }, { status: 400 });
-    }
-
-    // Pick an AI-compatible file path. Prefer converted image for non-image uploads.
-    const originalFilePath = scan.file_hash as string;
-    const analysisFilePath = await resolveAnalysisFilePath({
-      id: scan.id,
-      file_hash: originalFilePath,
-      converted_image: scan.converted_image as string | null,
+    const effectiveModality = resolveAnalysisModality({
+      storedModality: scan.modality as string | null,
+      originalName: scan.original_name as string | null,
+      filePath: scan.file_hash as string,
     });
 
-    if (!analysisFilePath) {
-      return NextResponse.json(
-        {
-          error: "AI analysis failed",
-          details: `Unsupported scan format (.${getFileExtension(originalFilePath)}). Upload a 2D image or provide a converted preview image for analysis.`,
-        },
-        { status: 422 }
-      );
+    const originalFilePath = scan.file_hash as string;
+    await supabaseServer
+      .from("scans")
+      .update({ status: "Processing" })
+      .eq("id", scan.id);
+
+    let aiAnalysis: AnalysisResult | null = null;
+    let monaiResult: MonaiResponse | null = null;
+    const providerErrors: { monai?: string; vision?: string } = {};
+
+    if (monaiUrl) {
+      if (isMonaiSupported(originalFilePath)) {
+        try {
+          const { data: monaiFile, error: monaiFileError } = await supabaseServer.storage
+            .from("scans")
+            .download(originalFilePath);
+
+          if (monaiFileError || !monaiFile) {
+            providerErrors.monai = monaiFileError?.message || "Unable to download the original scan for MONAI.";
+          } else {
+            const originalName = (scan.original_name as string) || originalFilePath.split("/").pop() || "scan.dcm";
+            monaiResult = await callMonaiService({
+              serviceUrl: monaiUrl,
+              sharedSecret: monaiSharedSecret,
+              fileBytes: await monaiFile.arrayBuffer(),
+              filename: originalName,
+              modality: effectiveModality,
+            });
+            console.log(">>> SUCCESS: MONAI analysis retrieved:", JSON.stringify(monaiResult).substring(0, 200) + "...");
+          }
+        } catch (monaiError) {
+          console.error(">>> ERROR: MONAI analysis failed:", monaiError);
+          providerErrors.monai = describeUnknownError(monaiError);
+        }
+      } else {
+        providerErrors.monai = `Unsupported scan format for MONAI (.${getFileExtension(originalFilePath)}).`;
+      }
     }
 
-    // Get the image URL with accessibility (signed/base64)
-    console.log("Attempting to get accessible image URL for scan:", scanId);
-    const imageUrl = await getAccessibleImageUrl(analysisFilePath);
-    console.log("Image source ready. Length:", imageUrl.length > 200 ? imageUrl.substring(0, 100) + "..." : imageUrl);
+    if (openRouterEnabled) {
+      const analysisFilePath = await resolveAnalysisFilePath({
+        id: scan.id,
+        file_hash: originalFilePath,
+        converted_image: scan.converted_image as string | null,
+      });
 
-    let aiAnalysis: AnalysisResult;
+      if (analysisFilePath) {
+        try {
+          const candidatePaths = buildAnalysisCandidates(originalFilePath, scan.converted_image as string | null);
+          const candidateImagePaths = candidatePaths.length > 0 ? candidatePaths : [analysisFilePath];
+          const candidateImageUrls = await Promise.all(candidateImagePaths.map((path) => getAccessibleImageUrl(path)));
 
-    try {
-      const candidatePaths = buildAnalysisCandidates(originalFilePath, scan.converted_image as string | null);
-      const candidateImageUrls = candidatePaths.length > 0
-        ? await Promise.all(candidatePaths.map((path) => getAccessibleImageUrl(path)))
-        : [imageUrl];
+          const analyses: AnalysisResult[] = [];
+          for (const candidateImageUrl of candidateImageUrls) {
+            console.log(">>> Sending image candidate to Llama 3.2 Vision for analysis...");
+            analyses.push(await analyzeWithVisionAI(candidateImageUrl, effectiveModality || "medical scan"));
+          }
 
-      const analyses: AnalysisResult[] = [];
-      for (const candidateImageUrl of candidateImageUrls) {
-        console.log(">>> Sending image candidate to Llama 3.2 Vision for analysis...");
-        analyses.push(await analyzeWithVisionAI(candidateImageUrl, scan.modality || "medical scan"));
+          aiAnalysis = aggregateAnalyses(analyses);
+          console.log(">>> SUCCESS: Vision AI analysis retrieved:", JSON.stringify(aiAnalysis).substring(0, 200) + "...");
+        } catch (aiError) {
+          console.error(">>> ERROR: Vision AI analysis failed:", aiError);
+          providerErrors.vision = describeUnknownError(aiError);
+        }
+      } else {
+        providerErrors.vision = `Unsupported scan format for Vision AI (.${getFileExtension(originalFilePath)}). Upload a 2D image or provide a converted preview image for analysis.`;
       }
+    }
 
-      aiAnalysis = aggregateAnalyses(analyses);
-      console.log(">>> SUCCESS: AI analysis retrieved:", JSON.stringify(aiAnalysis).substring(0, 200) + "...");
-    } catch (aiError) {
-      console.error(">>> ERROR: AI analysis failed:", aiError);
+    if (!aiAnalysis && !monaiResult) {
+      const details = [providerErrors.monai, providerErrors.vision].filter(Boolean).join(" ");
       return NextResponse.json(
         {
           error: "AI analysis failed",
-          details: aiError instanceof Error ? aiError.message : "Unable to complete analysis for this scan"
+          details: details || "No configured provider was able to analyze this scan.",
         },
         { status: 502 }
       );
     }
 
-    // Save Analysis Results to Supabase
-    const { data: analysis, error: analysisError } = await supabaseServer
-      .from('analysis_results')
-      .insert({
-        scan_id: scan.id,
-        confidence_score: aiAnalysis.confidence,
-        findings: aiAnalysis.findings
-      })
-      .select()
-      .single();
+    const combinedFindings = mergeAnalysisFindings({
+      monai: monaiResult,
+      vision: aiAnalysis
+        ? {
+            confidence: aiAnalysis.confidence,
+            parserMode: aiAnalysis.parserMode,
+            model: VISION_MODEL,
+            findings: aiAnalysis.findings,
+          }
+        : null,
+      providerErrors,
+    });
+    const monaiConfidence = monaiResult?.confidence_source === "model_probability" ? monaiResult.confidence : null;
+    const combinedConfidence = combineProviderConfidence({
+      monai: monaiConfidence,
+      vision: monaiConfidence === null ? aiAnalysis?.confidence : null,
+    });
+
+    // Save Analysis Results without relying on a DB-side unique constraint.
+    const analysisMutation = existingAnalysis?.id
+      ? supabaseServer
+          .from('analysis_results')
+          .update({
+            confidence_score: combinedConfidence,
+            findings: combinedFindings,
+          })
+          .eq('id', existingAnalysis.id)
+          .select()
+          .single()
+      : supabaseServer
+          .from('analysis_results')
+          .insert({
+            scan_id: scan.id,
+            confidence_score: combinedConfidence,
+            findings: combinedFindings,
+          })
+          .select()
+          .single();
+
+    const { data: analysis, error: analysisError } = await analysisMutation;
 
     if (analysisError) {
       console.error("Analysis insert error:", JSON.stringify(analysisError, null, 2));
-      return NextResponse.json({ error: "Failed to save analysis", details: analysisError }, { status: 500 });
+      await supabaseServer
+        .from('scans')
+        .update({ status: hasAnalysis ? "Analyzed" : "Pending Review" })
+        .eq('id', scan.id);
+      return NextResponse.json({ error: "Failed to save analysis", details: describeUnknownError(analysisError) }, { status: 500 });
     }
 
     // Update Scan Status
@@ -675,13 +923,48 @@ export async function POST(
     return NextResponse.json({
       success: true,
       analysis,
+      providers: {
+        monai: monaiResult
+          ? {
+              label: monaiResult.label,
+              confidence: monaiResult.confidence,
+              analysis_mode: monaiResult.analysis_mode,
+              confidence_source: monaiResult.confidence_source,
+              model_used: monaiResult.model_used,
+              model_description: monaiResult.model_description,
+              scope_note: monaiResult.scope_note,
+              inference_seconds: monaiResult.inference_seconds,
+              has_overlay: !!monaiResult.segmentation_overlay_base64,
+            }
+          : null,
+        vision: aiAnalysis
+          ? {
+              confidence: aiAnalysis.confidence,
+              model: VISION_MODEL,
+              parser_mode: aiAnalysis.parserMode,
+            }
+          : null,
+      },
+      providerErrors,
       rewardTxHash: txHashText,
       tokenMinted: tokenMintSuccessful,
-      message: "AI analysis complete using Vision AI"
+      message: monaiResult?.analysis_mode === "bundle" && aiAnalysis
+        ? hasAnalysis
+          ? "Analysis refreshed using MONAI + Vision AI report"
+          : "Analysis complete using MONAI + Vision AI report"
+        : monaiResult?.analysis_mode === "bundle"
+          ? hasAnalysis
+            ? "Analysis refreshed using MONAI"
+            : "AI analysis complete using MONAI"
+          : aiAnalysis
+            ? hasAnalysis
+              ? "Analysis refreshed using Vision AI report"
+              : "Analysis complete using Vision AI report"
+            : "MONAI could not produce a trained result for this upload",
     });
 
   } catch (error) {
     console.error("Analyze Route Error:", error);
-    return NextResponse.json({ error: "Internal Server Error", details: String(error) }, { status: 500 });
+    return NextResponse.json({ error: "Internal Server Error", details: describeUnknownError(error) }, { status: 500 });
   }
 }

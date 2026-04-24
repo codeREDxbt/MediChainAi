@@ -29,6 +29,24 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000) to view the app.
 
+### Docker Stack
+
+```bash
+# Build and run the full local stack
+docker compose up --build
+```
+
+On Windows, you can also use:
+
+```bat
+start-docker-stack.bat
+```
+
+This starts:
+
+- `nextjs` on `http://localhost:3000`
+- `monai-service` on `http://localhost:8000`
+
 ## Tech Stack
 
 - **Framework**: Next.js 15 (App Router)

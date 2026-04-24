@@ -9,6 +9,7 @@ import nacl from "tweetnacl";
 import bs58 from "bs58";
 import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
 import { loginSchema } from "@/lib/validation";
+import { isRequestTimeoutError, withRequestTimeout } from "@/lib/request-timeout";
 
 export async function POST(req: Request) {
     try {
@@ -64,11 +65,14 @@ export async function POST(req: Request) {
 
         // 2. Find or Create User via Supabase
         let user;
-        const { data: existingUser, error: findError } = await supabaseServer
-            .from('users')
-            .select('*')
-            .eq('wallet_address', walletAddress)
-            .single();
+        const { data: existingUser, error: findError } = await withRequestTimeout(
+            supabaseServer
+                .from('users')
+                .select('*')
+                .eq('wallet_address', walletAddress)
+                .single(),
+            { label: "Wallet user lookup" }
+        );
 
         if (findError && findError.code !== 'PGRST116') { // PGRST116 = not found
             console.error("Supabase find error:", findError);
@@ -79,14 +83,17 @@ export async function POST(req: Request) {
             user = existingUser;
         } else {
             // Create new user with default role
-            const { data: newUser, error: createError } = await supabaseServer
-                .from('users')
-                .insert([{ 
-                    wallet_address: walletAddress,
-                    role: "patient" // Default role for new users
-                }])
-                .select()
-                .single();
+            const { data: newUser, error: createError } = await withRequestTimeout(
+                supabaseServer
+                    .from('users')
+                    .insert([{ 
+                        wallet_address: walletAddress,
+                        role: "patient" // Default role for new users
+                    }])
+                    .select()
+                    .single(),
+                { label: "Wallet user create" }
+            );
 
             if (createError) {
                 console.error("Supabase create error:", createError);
@@ -130,6 +137,13 @@ export async function POST(req: Request) {
         return response;
     } catch (error) {
         console.error("Login route error:", error);
+
+        if (isRequestTimeoutError(error)) {
+            return NextResponse.json(
+                { error: "Authentication timed out. Please make sure local database services are running." },
+                { status: 504 }
+            );
+        }
         
         // Handle Zod validation errors
         if (error instanceof Error && error.name === 'ZodError') {

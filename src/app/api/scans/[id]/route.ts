@@ -6,6 +6,19 @@ import { getJwtSecret } from "@/lib/jwt";
 
 export const dynamic = 'force-dynamic';
 
+function resolveDisplayModality(filePath: string, storedModality?: string | null) {
+    const ext = filePath.toLowerCase().endsWith(".nii.gz")
+        ? "nii.gz"
+        : filePath.split(".").pop()?.toLowerCase();
+    const isImage = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp'].includes(ext || '');
+    const normalized = (storedModality || "").trim().toLowerCase();
+
+    if (normalized === "xray" || normalized === "x-ray") return "X-Ray";
+    if (normalized === "ct") return "CT";
+    if (isImage && !normalized) return "X-Ray";
+    return storedModality && storedModality !== "Unknown" ? storedModality : "Medical Scan";
+}
+
 export async function GET(
     _req: Request,
     { params }: { params: Promise<{ id: string }> }
@@ -41,32 +54,42 @@ export async function GET(
         const analysis = Array.isArray(scan.analysis_results)
             ? scan.analysis_results[0]
             : scan.analysis_results;
+        const confidenceScore = typeof analysis?.confidence_score === "number"
+            ? Math.round(analysis.confidence_score * 10) / 10
+            : 0;
+        const riskLevel = confidenceScore > 85
+            ? "High" as const
+            : confidenceScore > 65
+                ? "Medium" as const
+                : "Low" as const;
         const isImage = (() => {
             const ext = scan.file_hash?.split('.').pop()?.toLowerCase();
             return ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp'].includes(ext || '');
         })();
 
+        const displayModality = resolveDisplayModality(scan.file_hash, scan.modality);
+
         const formattedScan = {
             id: scan.id,
-            scanType: scan.modality && scan.modality !== "Unknown" ? scan.modality : "Medical Scan",
-            type: scan.modality && scan.modality !== "Unknown" ? scan.modality : "Medical Scan",
+            scanType: displayModality,
+            type: displayModality,
             originalName: scan.original_name,
             patientName: scan.patient_name,
             studyDate: scan.study_date,
             seriesDesc: scan.series_description,
-            riskScore: analysis?.confidence_score ? Math.round(analysis.confidence_score) : 0,
-            riskLevel: analysis?.confidence_score && analysis.confidence_score > 85 ? "High" as const : "Low" as const,
+            riskScore: confidenceScore,
+            riskLevel,
             findings: analysis?.findings ? JSON.stringify(analysis.findings) : "Pending Analysis",
-            confidence: analysis?.confidence_score ? Math.round(analysis.confidence_score) : 0,
-            aiScore: analysis?.confidence_score ? Math.round(analysis.confidence_score) : 0,
+            confidence: confidenceScore,
+            aiScore: confidenceScore,
             txHash: scan.file_hash,
             timestamp: scan.upload_date,
             date: scan.upload_date,
             imageUrl: isImage ? `/api/scans/${scan.id}/image` : `/api/scans/${scan.id}/image`,
             convertedImageUrl: scan.converted_image ? `/api/scans/${scan.id}/image?converted=true` : null,
             status: analysis ? "Analyzed" : (scan.status === "Analyzed" ? "Pending Review" : (scan.status || "Pending Review")),
-            modality: scan.modality,
-            region: scan.modality || scan.series_description || "Medical Scan",
+            modality: displayModality,
+            region: displayModality || scan.series_description || "Medical Scan",
             blockchain: "pending",
             size: "N/A",
         };

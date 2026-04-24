@@ -4,6 +4,8 @@ import { cookies } from "next/headers";
 import { supabaseServer } from "@/lib/supabase";
 import { getJwtSecret } from "@/lib/jwt";
 import { demoLoginSchema } from "@/lib/validation";
+import { getStableDemoUser } from "@/lib/demo-auth";
+import { isRequestTimeoutError, withRequestTimeout } from "@/lib/request-timeout";
 
 export const dynamic = 'force-dynamic';
 
@@ -19,42 +21,65 @@ export async function POST(req: Request) {
 
         const body = await req.json();
         const { role } = demoLoginSchema.parse(body);
+        const fallbackUser = getStableDemoUser(role);
 
         const demoAddress = role === "admin"
             ? "DemoAdmin_" + process.env.NEXT_PUBLIC_SUPABASE_URL?.slice(0, 10).replace(/[^a-zA-Z0-9]/g, '_')
             : "DemoPatient_" + process.env.NEXT_PUBLIC_SUPABASE_URL?.slice(0, 10).replace(/[^a-zA-Z0-9]/g, '_');
 
-        // Find existing user
-        const { data: existingUser, error: findError } = await supabaseServer
-            .from('users')
-            .select('*')
-            .eq('wallet_address', demoAddress)
-            .single();
+        let user = null;
+        let databaseUnavailable = false;
 
-        let user = existingUser;
+        try {
+            const { data: existingUser, error: findError } = await withRequestTimeout(
+                supabaseServer
+                    .from('users')
+                    .select('*')
+                    .eq('wallet_address', demoAddress)
+                    .single(),
+                { label: "Demo user lookup" }
+            );
 
-        if (findError && findError.code !== 'PGRST116') {
-            console.error("Supabase find error:", findError);
-            return NextResponse.json({ error: "Database error" }, { status: 500 });
+            if (findError && findError.code !== 'PGRST116') {
+                databaseUnavailable = true;
+                console.error("Supabase find error, using demo fallback:", findError);
+            } else {
+                user = existingUser;
+            }
+        } catch (error) {
+            databaseUnavailable = true;
+            console.error("Demo user lookup failed, using demo fallback:", error);
         }
 
         // Create user if not exists
-        if (!user) {
-            const { data: newUser, error: createError } = await supabaseServer
-                .from('users')
-                .insert([{
-                    wallet_address: demoAddress,
-                    username: `Demo ${role}`,
-                    role: role
-                }])
-                .select()
-                .single();
+        if (!user && !databaseUnavailable) {
+            try {
+                const { data: newUser, error: createError } = await withRequestTimeout(
+                    supabaseServer
+                        .from('users')
+                        .insert([{
+                            wallet_address: demoAddress,
+                            username: `Demo ${role}`,
+                            role: role
+                        }])
+                        .select()
+                        .single(),
+                    { label: "Demo user create" }
+                );
 
-            if (createError) {
-                console.error("Supabase create error:", createError);
-                return NextResponse.json({ error: "Failed to create user" }, { status: 500 });
+                if (createError) {
+                    console.error("Supabase create error:", createError);
+                    return NextResponse.json({ error: "Failed to create user" }, { status: 500 });
+                }
+                user = newUser;
+            } catch (error) {
+                databaseUnavailable = true;
+                console.error("Demo user creation failed, using demo fallback:", error);
             }
-            user = newUser;
+        }
+
+        if (!user) {
+            user = fallbackUser;
         }
 
         // Create JWT
@@ -88,6 +113,10 @@ export async function POST(req: Request) {
         });
     } catch (error) {
         console.error("Demo login error:", error);
+
+        if (isRequestTimeoutError(error)) {
+            return NextResponse.json({ error: "Demo login timed out" }, { status: 504 });
+        }
         
         if (error instanceof Error && error.name === 'ZodError') {
             return NextResponse.json(

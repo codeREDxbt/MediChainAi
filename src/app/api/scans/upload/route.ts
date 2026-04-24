@@ -7,15 +7,40 @@ import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
 import crypto from "crypto";
 import dicomParser from "dicom-parser";
 import { PNG } from "pngjs";
+import { resolveDemoUserId } from "@/lib/demo-auth";
+import { isRequestTimeoutError, withRequestTimeout } from "@/lib/request-timeout";
+import { scanUploadSchema } from "@/lib/validation";
+import {
+    formatUploadValidationIssues,
+    getOptionalUploadField,
+    getRequiredUploadField,
+} from "@/lib/upload-validation";
 
 const IMAGE_EXTENSIONS = new Set(["jpg", "jpeg", "png", "webp", "gif", "bmp"]);
 const ALLOWED_UPLOAD_EXTENSIONS = new Set(["dcm", "nii", "nii.gz", ...IMAGE_EXTENSIONS]);
 const MAX_UPLOAD_BYTES = Number(process.env.MAX_UPLOAD_BYTES || 50 * 1024 * 1024);
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
+const UPLOAD_SERVICE_TIMEOUT_MS = Number(process.env.UPLOAD_SERVICE_TIMEOUT_MS || 15000);
 
 const getFileExtension = (fileName: string): string => {
     const lowerName = fileName.toLowerCase();
     if (lowerName.endsWith('.nii.gz')) return 'nii.gz';
     return lowerName.split('.').pop()?.toLowerCase() || 'bin';
+};
+
+const inferModalityFromFile = (fileName: string): string => {
+    const lowerName = fileName.toLowerCase();
+    const ext = getFileExtension(fileName);
+
+    if (lowerName.includes("xray") || lowerName.includes("x-ray") || lowerName.includes("cxr")) return "X-Ray";
+    if (lowerName.includes("mri") || lowerName.includes("_mr") || lowerName.includes("-mr")) return "MRI";
+    if (lowerName.includes("pet")) return "PET";
+    if (lowerName.includes("mammo")) return "Mammography";
+    if (lowerName.includes("ultra")) return "Ultrasound";
+    if (ext === "nii" || ext === "nii.gz") return "MRI";
+    if (ext === "dcm") return "CT";
+    if (IMAGE_EXTENSIONS.has(ext)) return "CT";
+    return "Unknown";
 };
 
 const parseFirstNumber = (value?: string | null): number | null => {
@@ -47,14 +72,22 @@ const toPngPreviewFromDicom = (buffer: Buffer): Buffer | null => {
         }
 
         const offset = pixelDataElement.dataOffset;
+        const bytesNeeded = bitsAllocated > 8 ? pixelCount * 2 : pixelCount;
+        if (offset < 0 || offset + bytesNeeded > buffer.byteLength) {
+            console.warn("Pixel data extends beyond buffer bounds");
+            return null;
+        }
+
+        const pixelSlice = buffer.slice(offset, offset + bytesNeeded);
+
         let pixels: Int16Array | Uint8Array | Uint16Array;
 
         if (bitsAllocated > 8) {
             pixels = pixelRepresentation === 1
-                ? new Int16Array(buffer.buffer, buffer.byteOffset + offset, pixelCount)
-                : new Uint16Array(buffer.buffer, buffer.byteOffset + offset, pixelCount);
+                ? new Int16Array(pixelSlice.buffer, pixelSlice.byteOffset, pixelCount)
+                : new Uint16Array(pixelSlice.buffer, pixelSlice.byteOffset, pixelCount);
         } else {
-            pixels = new Uint8Array(buffer.buffer, buffer.byteOffset + offset, pixelCount);
+            pixels = new Uint8Array(pixelSlice.buffer, pixelSlice.byteOffset, pixelCount);
         }
 
         const rescaleIntercept = parseFirstNumber(dataSet.string('x00281052')) ?? 0;
@@ -112,6 +145,53 @@ const getContentType = (fileName: string, fallback: string): string => {
     return mimeTypes[ext || ''] || fallback;
 };
 
+const normalizeModality = (value?: string | null, fileName?: string | null): string | null => {
+    const normalized = (value || "").trim().toUpperCase();
+    const inferred = inferModalityFromFile(fileName || "");
+
+    if (!normalized || normalized === "UNKNOWN" || normalized === "DICOM") {
+        return inferred;
+    }
+
+    if (normalized === "X-RAY" || normalized === "X RAY") {
+        return "X-Ray";
+    }
+
+    if (normalized === "ULTRASOUND") return "Ultrasound";
+    if (normalized === "MAMMOGRAPHY") return "Mammography";
+    if (normalized === "XRAY") return "X-Ray";
+    if (normalized === "CT" || normalized === "MRI" || normalized === "PET") {
+        return normalized;
+    }
+
+    return inferred;
+};
+
+const toLegacyDatabaseModality = (value?: string | null): string | null => {
+    switch (value) {
+        case "X-Ray":
+            return "XRAY";
+        default:
+            return value ?? null;
+    }
+};
+
+const isModalityConstraintError = (message?: string | null) =>
+    typeof message === "string" && /scans_modality_check|modality/i.test(message);
+
+const isLocalSupabase = (): boolean => /localhost|127\.0\.0\.1/i.test(SUPABASE_URL);
+
+const toUploadServiceError = (message: string) => {
+    const offlineHint = isLocalSupabase()
+        ? "Local Supabase storage appears offline. Start Docker Desktop and ensure the Supabase containers are running."
+        : "Storage backend is currently unavailable.";
+
+    return NextResponse.json({
+        error: "Storage service unavailable",
+        details: `${offlineHint} ${message}`.trim()
+    }, { status: 503 });
+};
+
 export async function POST(req: Request) {
     try {
         const ip = getClientIp(req);
@@ -132,7 +212,12 @@ export async function POST(req: Request) {
 
         const secret = getJwtSecret();
         const { payload } = await jwtVerify(token, secret);
-        const userId = payload.sub as string;
+        const userId = await resolveDemoUserId({
+            userId: payload.sub as string,
+            walletAddress: payload.walletAddress,
+            role: payload.role,
+            supabase: supabaseServer,
+        });
 
         if (!userId) {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -140,14 +225,30 @@ export async function POST(req: Request) {
 
         const formData = await req.formData();
         const file = formData.get("file") as File | null;
-        const modality = formData.get("modality") as string || "Unknown";
-        const originalName = formData.get("originalName") as string || file?.name || "Unknown";
-        const patientName = formData.get("patientName") as string || null;
-        const studyDateStr = formData.get("studyDate") as string || null;
+        const modalityInput = getOptionalUploadField(formData.get("modality")) ?? "Unknown";
+        const originalName = getRequiredUploadField(formData.get("originalName"), file?.name || "Unknown").slice(0, 255);
+        const patientName = getOptionalUploadField(formData.get("patientName"))?.slice(0, 255) ?? null;
+        const studyDateStr = getOptionalUploadField(formData.get("studyDate")) ?? null;
+        const modality = normalizeModality(modalityInput, originalName || file?.name);
+
+        // Validate inputs
+        const validationResult = scanUploadSchema.safeParse({
+            modality: getOptionalUploadField(formData.get("modality")),
+            originalName,
+            patientName: getOptionalUploadField(formData.get("patientName")),
+            studyDate: getOptionalUploadField(formData.get("studyDate")),
+        });
+
+        if (!validationResult.success) {
+            return NextResponse.json({ error: "Invalid input data", details: formatUploadValidationIssues(validationResult.error.issues) }, { status: 400 });
+        }
 
         if (!file) {
             return NextResponse.json({ error: "No file provided" }, { status: 400 });
         }
+
+        // Log initial file size
+        console.log(`[UPLOAD] File received: ${originalName} | Size: ${file.size} bytes (${(file.size / 1024).toFixed(2)} KB) | Type: ${file.type}`);
 
         if (file.size > MAX_UPLOAD_BYTES) {
             return NextResponse.json(
@@ -156,11 +257,29 @@ export async function POST(req: Request) {
             );
         }
 
-        const studyDate = studyDateStr ? new Date(studyDateStr) : null;
+        const studyDate = studyDateStr ? (() => {
+            const d = new Date(studyDateStr);
+            return Number.isNaN(d.getTime()) ? null : d;
+        })() : null;
 
         // Convert file to buffer and generate hash
         const arrayBuffer = await file.arrayBuffer();
         const buffer = Buffer.from(arrayBuffer);
+        
+        // CRITICAL: Verify buffer size matches file size - detect truncation early
+        if (buffer.byteLength !== file.size) {
+            console.error(`[UPLOAD TRUNCATION] ${originalName} | Expected: ${file.size} bytes, Got: ${buffer.byteLength} bytes | Loss: ${file.size - buffer.byteLength} bytes | Percentage lost: ${((file.size - buffer.byteLength) / file.size * 100).toFixed(1)}%`);
+            return NextResponse.json(
+                {
+                    error: "File upload failed: Data loss detected during transfer",
+                    details: `Upload incomplete: expected ${(file.size / 1024).toFixed(2)} KB, received ${(buffer.byteLength / 1024).toFixed(2)} KB. Possible causes: slow network, timeout, or server issue. Try again or check your internet connection.`
+                },
+                { status: 400 }
+            );
+        }
+        
+        console.log(`[UPLOAD] Buffer created successfully | File: ${originalName} | Size: ${buffer.byteLength} bytes`);
+        
         const hash = crypto.createHash("sha256").update(buffer).digest("hex");
         const fileExt = getFileExtension(file.name);
 
@@ -179,20 +298,28 @@ export async function POST(req: Request) {
         let convertedImagePath: string | null = null;
 
         // Upload to Supabase Storage
-        const { error: storageError } = await supabaseServer.storage
-            .from("scans")
-            .upload(fileName, buffer, {
-                contentType: contentType,
-                upsert: true
-            });
+        const { error: storageError } = await withRequestTimeout(
+            supabaseServer.storage
+                .from("scans")
+                .upload(fileName, buffer, {
+                    contentType: contentType,
+                    upsert: true
+                }),
+            { label: "Primary scan upload", timeoutMs: UPLOAD_SERVICE_TIMEOUT_MS }
+        );
 
         if (storageError) {
             console.error("Storage Error:", storageError.message);
+            if (/fetch failed|connection|network|ECONNREFUSED|unreachable/i.test(storageError.message)) {
+                return toUploadServiceError(storageError.message);
+            }
             return NextResponse.json({
                 error: "Failed to upload file to storage",
                 details: storageError.message
             }, { status: 500 });
         }
+
+        console.log(`[UPLOAD SUCCESS] File stored in Supabase | Path: ${fileName} | Size: ${buffer.byteLength} bytes | Hash: ${hash.slice(0, 16)}`);
 
         if (isDirectImage) {
             convertedImagePath = fileName;
@@ -200,12 +327,15 @@ export async function POST(req: Request) {
             const previewBuffer = toPngPreviewFromDicom(buffer);
             if (previewBuffer) {
                 const previewFileName = `${userId}/${hash.slice(0, 16)}-preview.png`;
-                const { error: previewUploadError } = await supabaseServer.storage
-                    .from("scans")
-                    .upload(previewFileName, previewBuffer, {
-                        contentType: 'image/png',
-                        upsert: true
-                    });
+                const { error: previewUploadError } = await withRequestTimeout(
+                    supabaseServer.storage
+                        .from("scans")
+                        .upload(previewFileName, previewBuffer, {
+                            contentType: 'image/png',
+                            upsert: true
+                        }),
+                    { label: "Preview image upload", timeoutMs: UPLOAD_SERVICE_TIMEOUT_MS }
+                );
 
                 if (!previewUploadError) {
                     convertedImagePath = previewFileName;
@@ -215,21 +345,37 @@ export async function POST(req: Request) {
             }
         }
 
-        // Save metadata to Supabase database
-        const { data: scan, error: scanError } = await supabaseServer
-            .from('scans')
-            .insert({
-                user_id: userId,
-                file_hash: fileName,
-                original_name: originalName,
-                modality: modality,
-                patient_name: patientName,
-                study_date: studyDate?.toISOString() || null,
-                converted_image: convertedImagePath,
-                status: "Pending Review"
-            })
-            .select()
-            .single();
+        const insertScanRecord = (modalityValue: string | null) =>
+            withRequestTimeout(
+                supabaseServer
+                    .from('scans')
+                    .insert({
+                        user_id: userId,
+                        file_hash: fileName,
+                        original_name: originalName,
+                        modality: modalityValue,
+                        patient_name: patientName,
+                        study_date: studyDate?.toISOString() || null,
+                        converted_image: convertedImagePath,
+                        status: "Pending Review"
+                    })
+                    .select()
+                    .single(),
+                { label: "Scan record insert", timeoutMs: UPLOAD_SERVICE_TIMEOUT_MS }
+            );
+
+        // Save metadata to Supabase database, retrying with legacy modality codes if needed.
+        let { data: scan, error: scanError } = await insertScanRecord(modality);
+
+        if (scanError && isModalityConstraintError(scanError.message)) {
+            const legacyModality = toLegacyDatabaseModality(modality);
+            if (legacyModality && legacyModality !== modality) {
+                console.warn(`Retrying scan insert with legacy modality '${legacyModality}' after constraint error.`);
+                const retryResult = await insertScanRecord(legacyModality);
+                scan = retryResult.data;
+                scanError = retryResult.error;
+            }
+        }
 
         if (scanError) {
             console.error("Scan insert error:", scanError.message);
@@ -247,14 +393,22 @@ export async function POST(req: Request) {
         return NextResponse.json({
             success: true,
             scan,
-            imageUrl: urlData.publicUrl
+            imageUrl: urlData.publicUrl,
+            ...(convertedImagePath ? {} : { warning: "Preview generation failed. File stored but no preview available." })
         });
 
     } catch (error) {
         console.error("Upload Error:", error instanceof Error ? error.message : String(error));
+        if (isRequestTimeoutError(error)) {
+            return toUploadServiceError(error.message);
+        }
+        const message = error instanceof Error ? error.message : String(error);
+        if (/fetch failed|connection|network|ECONNREFUSED|unreachable/i.test(message)) {
+            return toUploadServiceError(message);
+        }
         return NextResponse.json({
             error: "Internal Server Error",
-            details: error instanceof Error ? error.message : String(error)
+            details: message
         }, { status: 500 });
     }
 }

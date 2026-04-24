@@ -18,7 +18,9 @@ Medical-image AI microservice for **MediChainAi**, powered by [MONAI](https://mo
 |----------|------|--------|
 | CT | Organ segmentation | `spleen_ct_segmentation` |
 | MRI | Brain tumour segmentation | `brats_mri_segmentation` |
-| X-Ray | Chest classification | `chest_xray_classification` |
+| Mammography | Breast density classification | `breast_density_classification` |
+
+`X-Ray`, `PET`, and `Ultrasound` are exposed in the API schema, but this local build does not currently ship a compatible MONAI bundle for those modalities.
 
 ## Setup (Local Dev)
 

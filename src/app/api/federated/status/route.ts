@@ -3,6 +3,7 @@ import { jwtVerify } from "jose";
 import { cookies } from "next/headers";
 import { supabaseServer } from "@/lib/supabase";
 import { getJwtSecret } from "@/lib/jwt";
+import { getActualModelConfidence } from "@/lib/analysis-confidence";
 
 export const dynamic = 'force-dynamic';
 
@@ -24,7 +25,7 @@ export async function GET() {
 
         const { data: scans, error: scansError } = await supabaseServer
             .from('scans')
-            .select('id, upload_date, status, analysis_results(confidence_score)')
+            .select('id, upload_date, status, analysis_results(confidence_score, findings)')
             .eq('user_id', userId)
             .order('upload_date', { ascending: false })
             .limit(10);
@@ -45,8 +46,11 @@ export async function GET() {
                     ? scan.analysis_results[0]
                     : scan.analysis_results;
 
-                const score = analysis?.confidence_score;
-                if (score !== null && score !== undefined) {
+                const score = getActualModelConfidence({
+                    findings: analysis?.findings,
+                    fallbackConfidence: analysis?.confidence_score,
+                });
+                if (score !== null) {
                     totalConfidence += score;
                     confidenceCount++;
                 }

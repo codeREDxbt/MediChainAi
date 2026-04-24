@@ -39,6 +39,7 @@
         "./src/types/*"
       ]
     },
+    "ignoreDeprecations": "5.0",
     "baseUrl": "."
   },
   "include": [

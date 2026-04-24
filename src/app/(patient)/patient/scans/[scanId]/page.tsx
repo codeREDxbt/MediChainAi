@@ -18,6 +18,7 @@ import {
   AlertCircle
 } from "lucide-react";
 import Image from "next/image";
+import { getActualModelConfidence } from "@/lib/analysis-confidence";
 
 interface FormattedScan {
   id: string;
@@ -165,6 +166,10 @@ export default function Page({ params }: { params: Promise<{ scanId: string }> }
   }
 
   const confidence = scan.confidence || 0;
+  const displayConfidence = getActualModelConfidence({
+    findings: scan.findings,
+    fallbackConfidence: typeof scan.confidence === "number" && scan.confidence > 0 ? scan.confidence : null,
+  });
   const riskScore = scan.riskScore || (100 - confidence);
   const displayStatus = scan.status === "Analyzed" ? "Analyzed" : scan.status === "Pending Review" ? "Pending Review" : scan.status === "Pending" ? "Pending" : "Processing";
   const displayModality = scan.modality || scan.scanType || scan.region || "Medical Scan";
@@ -299,12 +304,12 @@ export default function Page({ params }: { params: Promise<{ scanId: string }> }
                     <div className="space-y-2">
                       <div className="flex justify-between text-sm">
                         <span className="text-muted-foreground">Confidence Score</span>
-                        <span className="font-medium">{confidence.toFixed(1)}%</span>
+                        <span className="font-medium">{displayConfidence !== null ? `${displayConfidence.toFixed(1)}%` : "N/A"}</span>
                       </div>
                       <Progress 
                         aria-label="Confidence Score" 
-                        value={confidence} 
-                        color={getRiskColor(confidence)} 
+                        value={displayConfidence ?? 0} 
+                        color={getRiskColor(displayConfidence ?? 0)} 
                         size="sm" 
                       />
                     </div>

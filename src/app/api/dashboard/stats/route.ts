@@ -4,8 +4,13 @@ import { cookies } from "next/headers";
 import { supabaseServer } from "@/lib/supabase";
 import { getJwtSecret } from "@/lib/jwt";
 import { buildDashboardStats } from "@/lib/dashboard-stats";
+import { withRequestTimeout } from "@/lib/request-timeout";
 
 export const dynamic = 'force-dynamic';
+
+function isDemoWalletAddress(value: unknown): value is string {
+    return typeof value === "string" && value.startsWith("Demo");
+}
 
 export async function GET() {
     try {
@@ -19,31 +24,39 @@ export async function GET() {
 
         const { payload } = await jwtVerify(token, secret);
         const userId = payload.sub as string;
+        const walletAddress = payload.walletAddress;
 
         if (!userId) {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
         }
 
-        const { data: scans, error: scansError } = await supabaseServer
-            .from('scans')
-            .select('id, upload_date')
-            .eq('user_id', userId);
+        let scans = null;
+        let scansError = null;
+
+        try {
+            const result = await withRequestTimeout(
+                supabaseServer
+                    .from('scans')
+                    .select('id, upload_date, status, analysis_results(confidence_score, findings)')
+                    .eq('user_id', userId),
+                { label: "Dashboard scans lookup" }
+            );
+
+            scans = result.data;
+            scansError = result.error;
+        } catch (error) {
+            scansError = error;
+        }
 
         if (scansError) {
             console.error("Supabase scans error:", scansError);
+            if (isDemoWalletAddress(walletAddress)) {
+                return NextResponse.json({ stats: buildDashboardStats([], []) });
+            }
             return NextResponse.json({ error: "Failed to fetch scans" }, { status: 500 });
         }
 
-        const { data: analyses, error: analysesError } = await supabaseServer
-            .from('scans')
-            .select('analysis_results(confidence_score)')
-            .eq('user_id', userId);
-
-        if (analysesError) {
-            console.error("Supabase analyses error:", analysesError);
-        }
-
-        const stats = buildDashboardStats(scans ?? [], analyses ?? []);
+        const stats = buildDashboardStats(scans ?? []);
 
         return NextResponse.json({ stats });
     } catch (error) {

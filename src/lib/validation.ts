@@ -11,7 +11,10 @@ export const demoLoginSchema = z.object({
 });
 
 export const scanUploadSchema = z.object({
-  modality: z.string().optional(),
+  modality: z.string().max(100).optional(),
+  originalName: z.string().max(255).optional(),
+  patientName: z.string().max(255).optional(),
+  studyDate: z.string().datetime().optional(),
 });
 
 export const scanAnalyzeSchema = z.object({

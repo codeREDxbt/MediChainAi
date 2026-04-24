@@ -16,14 +16,16 @@ import logging
 import os
 import secrets
 import time
+import base64
 from contextlib import asynccontextmanager
 from typing import Any
 
 import uvicorn
 from dotenv import load_dotenv
-from fastapi import FastAPI, File, Form, Header, HTTPException, UploadFile
+from fastapi import FastAPI, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from starlette.datastructures import UploadFile as StarletteUploadFile
 
 load_dotenv()
 
@@ -79,61 +81,55 @@ app.add_middleware(
 
 @app.get("/health", summary="Service health check")
 async def health() -> dict[str, Any]:
-    from model_loader import BUNDLE_CONFIG, _model_cache  # type: ignore[attr-defined]
+    from model_loader import _model_cache, get_bundle_catalog  # type: ignore[attr-defined]
+    catalog = get_bundle_catalog()
     cached = list(_model_cache.keys())
     return {
         "status": "ok",
         "service": "MediChainAi MONAI Service",
         "version": "1.0.0",
         "cached_models": cached,
-        "available_modalities": list(BUNDLE_CONFIG.keys()),
+        "available_modalities": [entry["modality"] for entry in catalog if entry["available"]],
+        "configured_modalities": [entry["modality"] for entry in catalog],
+        "bundle_catalog": catalog,
     }
 
 
 @app.get("/models", summary="List available MONAI bundles")
 async def list_models() -> dict[str, Any]:
-    from model_loader import BUNDLE_CONFIG
-    return {
-        "bundles": [
-            {
-                "modality": mod,
-                "bundle_name": cfg["bundle_name"],
-                "description": cfg["description"],
-                "labels": cfg["label_names"],
-            }
-            for mod, cfg in BUNDLE_CONFIG.items()
-        ]
-    }
+    from model_loader import get_bundle_catalog
+    return {"bundles": get_bundle_catalog()}
 
 
 @app.post("/analyze", summary="Analyze a medical image with MONAI")
-async def analyze(
-    file: UploadFile = File(..., description="DICOM (.dcm), NIfTI (.nii/.nii.gz), or image file"),
-    modality: str = Form(default="CT", description="CT | MRI | X-Ray | Ultrasound"),
-    x_monai_shared_secret: str | None = Header(default=None, alias="x-monai-shared-secret"),
-) -> JSONResponse:
+async def analyze(request: Request) -> JSONResponse:
     """
-    Accepts a scan file and modality string.
+    Accepts either:
+      - multipart/form-data with `file` + `modality`
+      - application/json with `file_base64`, `filename`, and optional `modality`
+
     Returns structured AI findings + a segmentation overlay PNG (base64).
     """
-    if not file.filename:
-        raise HTTPException(status_code=400, detail="No filename provided.")
-
     expected_secret = os.getenv("MONAI_SHARED_SECRET")
-    if expected_secret and not secrets.compare_digest(x_monai_shared_secret or "", expected_secret):
+    provided_secret = request.headers.get("x-monai-shared-secret", "")
+    if expected_secret and not secrets.compare_digest(provided_secret, expected_secret):
         raise HTTPException(status_code=401, detail="Unauthorized MONAI caller")
 
+    file_name, file_bytes, modality = await _extract_analyze_payload(request)
+
+    if not file_name:
+        raise HTTPException(status_code=400, detail="No filename provided.")
+
     _validate_modality(modality)
-    _validate_extension(file.filename)
+    _validate_extension(file_name)
 
     logger.info(
         "Received file: %s  modality: %s  size: ~%s bytes",
-        file.filename,
+        file_name,
         modality,
-        file.size or "unknown",
+        len(file_bytes),
     )
 
-    file_bytes = await file.read()
     if not file_bytes:
         raise HTTPException(status_code=400, detail="Uploaded file is empty.")
 
@@ -141,7 +137,7 @@ async def analyze(
 
     try:
         from inference import run_inference
-        result = run_inference(file_bytes, file.filename, modality)
+        result = run_inference(file_bytes, file_name, modality)
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     except RuntimeError as exc:
@@ -155,7 +151,7 @@ async def analyze(
         content={
             **result,
             "inference_seconds": elapsed,
-            "filename": file.filename,
+            "filename": file_name,
             "modality": modality,
         }
     )
@@ -171,6 +167,59 @@ ALLOWED_EXTENSIONS = {
 }
 
 ALLOWED_MODALITIES = {"CT", "MRI", "X-Ray", "Ultrasound", "PET", "Mammography"}
+
+
+async def _extract_analyze_payload(request: Request) -> tuple[str, bytes, str]:
+    content_type = request.headers.get("content-type", "").lower()
+
+    if "multipart/form-data" in content_type:
+        try:
+            form = await request.form()
+        except Exception as exc:
+            raise HTTPException(status_code=400, detail=f"Invalid multipart request: {exc}") from exc
+
+        file = form.get("file")
+        modality = str(form.get("modality") or "CT")
+
+        if isinstance(file, (UploadFile, StarletteUploadFile)):
+            return file.filename or "", await file.read(), modality
+
+        if hasattr(file, "filename") and hasattr(file, "read"):
+            return str(getattr(file, "filename", "") or ""), await file.read(), modality
+
+        file_type = type(file).__name__ if file is not None else "None"
+        raise HTTPException(
+            status_code=400,
+            detail=f"Multipart request must include a file field named 'file'. Received: {file_type}",
+        )
+
+    if "application/json" in content_type:
+        try:
+            payload = await request.json()
+        except Exception as exc:
+            raise HTTPException(status_code=400, detail=f"Invalid JSON request: {exc}") from exc
+
+        if not isinstance(payload, dict):
+            raise HTTPException(status_code=400, detail="JSON request body must be an object.")
+
+        encoded = payload.get("file_base64")
+        file_name = str(payload.get("filename") or "")
+        modality = str(payload.get("modality") or "CT")
+
+        if not encoded or not isinstance(encoded, str):
+            raise HTTPException(status_code=400, detail="JSON request must include a base64 string in 'file_base64'.")
+
+        try:
+            file_bytes = base64.b64decode(encoded, validate=True)
+        except Exception as exc:
+            raise HTTPException(status_code=400, detail=f"Invalid base64 file payload: {exc}") from exc
+
+        return file_name, file_bytes, modality
+
+    raise HTTPException(
+        status_code=415,
+        detail="Unsupported Content-Type. Use multipart/form-data or application/json.",
+    )
 
 
 def _validate_modality(modality: str) -> None:

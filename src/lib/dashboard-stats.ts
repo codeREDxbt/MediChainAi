@@ -1,17 +1,15 @@
+import { getActualModelConfidence } from "@/lib/analysis-confidence";
+
+export interface ScanAnalysisRecord {
+  confidence_score?: number | null;
+  findings?: unknown;
+}
+
 export interface ScanRecord {
   id: string;
   upload_date: string;
-}
-
-export interface AnalysisRecord {
-  analysis_results:
-    | {
-        confidence_score?: number | null;
-      }
-    | Array<{
-        confidence_score?: number | null;
-      }>
-    | null;
+  status?: string | null;
+  analysis_results?: ScanAnalysisRecord | ScanAnalysisRecord[] | null;
 }
 
 export interface DashboardStat {
@@ -22,37 +20,53 @@ export interface DashboardStat {
   icon: string;
 }
 
-function getConfidenceScore(record: AnalysisRecord): number | null {
-  const analysis = Array.isArray(record.analysis_results)
-    ? record.analysis_results[0]
-    : record.analysis_results;
-
-  const score = analysis?.confidence_score;
-
-  if (score === null || score === undefined || Number.isNaN(Number(score))) {
-    return null;
+function getAnalysisRecord(scan: ScanRecord): ScanAnalysisRecord | null {
+  if (Array.isArray(scan.analysis_results)) {
+    return scan.analysis_results[0] ?? null;
   }
 
-  return Number(score);
+  return scan.analysis_results ?? null;
+}
+
+function getConfidenceScore(scan: ScanRecord): number | null {
+  const analysis = getAnalysisRecord(scan);
+
+  return getActualModelConfidence({
+    findings: analysis?.findings,
+    fallbackConfidence: analysis?.confidence_score,
+  });
 }
 
 export function buildDashboardStats(
   scans: ScanRecord[],
-  analyses: AnalysisRecord[],
   now: Date = new Date()
 ): DashboardStat[] {
   const totalScans = scans.length;
+  const reportsSubmitted = scans.filter((scan) => getAnalysisRecord(scan) !== null).length;
+  const scansDone = scans.filter((scan) => {
+    const status = scan.status?.toLowerCase();
+    return status === "analyzed" || status === "pending review";
+  }).length;
 
   const sevenDaysAgo = new Date(now);
   sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
 
   const recentScans = scans.filter((scan) => new Date(scan.upload_date) >= sevenDaysAgo).length;
+  const recentReports = scans.filter((scan) => {
+    if (new Date(scan.upload_date) < sevenDaysAgo) return false;
+    return getAnalysisRecord(scan) !== null;
+  }).length;
+  const recentCompleted = scans.filter((scan) => {
+    if (new Date(scan.upload_date) < sevenDaysAgo) return false;
+    const status = scan.status?.toLowerCase();
+    return status === "analyzed" || status === "pending review";
+  }).length;
 
   let totalConfidence = 0;
   let confidenceCount = 0;
 
-  for (const analysisRecord of analyses) {
-    const score = getConfidenceScore(analysisRecord);
+  for (const scan of scans) {
+    const score = getConfidenceScore(scan);
     if (score !== null) {
       totalConfidence += score;
       confidenceCount++;
@@ -63,16 +77,30 @@ export function buildDashboardStats(
 
   return [
     {
-      label: "LOCAL SCANS",
+      label: "TOTAL SCANS",
       value: totalScans,
       delta: `+${recentScans} this week`,
       deltaType: recentScans > 0 ? "positive" : "neutral",
       icon: "scan",
     },
     {
-      label: "ACCURACY",
+      label: "REPORTS SUBMITTED",
+      value: reportsSubmitted,
+      delta: `+${recentReports} this week`,
+      deltaType: recentReports > 0 ? "positive" : "neutral",
+      icon: "report",
+    },
+    {
+      label: "SCANS DONE",
+      value: scansDone,
+      delta: `+${recentCompleted} this week`,
+      deltaType: recentCompleted > 0 ? "positive" : "neutral",
+      icon: "completed",
+    },
+    {
+      label: "MODEL CONFIDENCE",
       value: confidenceCount > 0 ? `${avgAccuracy.toFixed(1)}%` : "N/A",
-      delta: confidenceCount > 0 ? "~" : "No data",
+      delta: confidenceCount > 0 ? `${confidenceCount} analyzed` : "No data",
       deltaType: "positive",
       icon: "accuracy",
     },

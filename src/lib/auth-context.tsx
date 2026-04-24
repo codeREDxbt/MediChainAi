@@ -37,6 +37,27 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 // Optional: Provide a default mint address if env is missing, for dev purposes
 const MCI_TOKEN_MINT = process.env.NEXT_PUBLIC_MCI_TOKEN_MINT || "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"; // Defaulting to USDC mainnet format, but will be overriden by devnet
 
+async function fetchJsonWithTimeout(input: RequestInfo | URL, init?: RequestInit) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 10000);
+
+  try {
+    const response = await fetch(input, {
+      ...init,
+      signal: controller.signal,
+    });
+    const data = await response.json();
+    return { response, data };
+  } catch (error) {
+    if (error instanceof DOMException && error.name === "AbortError") {
+      throw new Error("Request timed out. Please make sure local services are running.");
+    }
+    throw error;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -77,8 +98,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Fetch current user from server
   const fetchUser = useCallback(async () => {
     try {
-      const response = await fetch('/api/auth/me');
-      const data = await response.json();
+      const { data } = await fetchJsonWithTimeout('/api/auth/me');
 
       if (data.user) {
         setUser(data.user);
@@ -118,9 +138,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setIsLoading(true);
 
       // 1. Get nonce from server
-      const nonceResponse = await fetch('/api/auth/nonce', { method: 'POST' });
+      const { response: nonceResponse, data: nonceData } = await fetchJsonWithTimeout('/api/auth/nonce', { method: 'POST' });
       if (!nonceResponse.ok) throw new Error('Failed to get nonce');
-      const { nonce } = await nonceResponse.json();
+      const { nonce } = nonceData;
 
       if (!nonce) {
         throw new Error('Failed to get nonce');
@@ -135,7 +155,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const signature = bs58.encode(signatureBytes);
 
       // 4. Verify signature on server
-      const verifyResponse = await fetch('/api/auth/login', {
+      const { response: verifyResponse, data: verifyData } = await fetchJsonWithTimeout('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -144,8 +164,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           publicKey: publicKey.toBase58()
         }),
       });
-
-      const verifyData = await verifyResponse.json();
 
       if (!verifyResponse.ok) {
         throw new Error(verifyData.error || 'Verification failed');
@@ -178,12 +196,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const switchRole = useCallback(async (role: UserRole) => {
     try {
       setIsLoading(true);
-      const res = await fetch('/api/auth/demo', {
+      const { response: res, data } = await fetchJsonWithTimeout('/api/auth/demo', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ role })
       });
-      const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Demo login failed');
       setUser(data.user);
     } catch (e) {

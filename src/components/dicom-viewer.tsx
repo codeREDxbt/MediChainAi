@@ -91,7 +91,7 @@ export function DicomViewer({ url, className }: DicomViewerProps) {
                 // Extract essential metadata (with fallback methods for non-standard encodings)
                 const rows = dataSet.uint16('x00280010') ?? dataSet.intString('x00280010');
                 const cols = dataSet.uint16('x00280011') ?? dataSet.intString('x00280011');
-                const bitsStored = dataSet.uint16('x00280101') ?? dataSet.uint16('x00280100') ?? dataSet.intString('x00280101') ?? 8;
+                const bitsAllocated = dataSet.uint16('x00280100') ?? dataSet.intString('x00280100') ?? 16;
                 const pixelRepresentation = dataSet.uint16('x00280103') ?? dataSet.intString('x00280103') ?? 0; // 0 = unsigned, 1 = signed
                 const rescaleIntercept = dataSet.floatString('x00281052') || 0;
                 const rescaleSlope = dataSet.floatString('x00281053') || 1;
@@ -111,15 +111,29 @@ export function DicomViewer({ url, className }: DicomViewerProps) {
                 // Handle pixel data
                 let pixels: Int16Array | Uint8Array | Uint16Array;
                 const offset = pixelDataElement.dataOffset;
+                const pixelCount = rows * cols;
+                const bytesPerPixel = bitsAllocated > 8 ? 2 : 1;
+                const requiredBytes = pixelCount * bytesPerPixel;
+                const availableBytes = arrayBuffer.byteLength - offset;
 
-                if (bitsStored > 8) {
+                if (!Number.isFinite(pixelCount) || pixelCount <= 0 || pixelCount > 4096 * 4096) {
+                    throw new Error("This DICOM image is too large or malformed to render in-browser.");
+                }
+
+                if (offset < 0 || availableBytes < requiredBytes) {
+                    throw new Error("This DICOM uses compressed or unsupported pixel data, so it cannot be decoded in-browser. Use the converted preview image if available.");
+                }
+
+                const pixelSlice = arrayBuffer.slice(offset, offset + requiredBytes);
+
+                if (bitsAllocated > 8) {
                     if (pixelRepresentation === 1) {
-                        pixels = new Int16Array(arrayBuffer, offset, rows * cols);
+                        pixels = new Int16Array(pixelSlice);
                     } else {
-                        pixels = new Uint16Array(arrayBuffer, offset, rows * cols);
+                        pixels = new Uint16Array(pixelSlice);
                     }
                 } else {
-                    pixels = new Uint8Array(arrayBuffer, offset, rows * cols);
+                    pixels = new Uint8Array(pixelSlice);
                 }
 
                 // Calculate min/max for windowing if not explicitly provided
